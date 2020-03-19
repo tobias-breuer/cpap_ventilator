@@ -9,7 +9,7 @@ int val; // Variable um den Vert des Analogen Pin zwischen zu speichern
 // Setze den Pin für die LED auf 13
 const byte ledPinOne = 13;
 const byte ledPinTwo = 6;
-const byte ledPinThree = 5;
+const byte ledPinWarning = 5;
 
 // Setze Interruptpins
 const byte interruptPinOne = 1;
@@ -31,6 +31,39 @@ long timethree = 5000;
 
 long amplitude;
 
+long int loopcount = 0;
+long int loopcount_warning = 10;
+
+//---------------------------------------------------------------------------------------------------------
+void debounceInterrupt() {
+  if ((long)(micros() - last_micros) >= debouncing_time*1){
+    Interrupt();
+    last_micros = micros();
+  }
+}
+
+void debounceInterruptTwo() {
+  if ((long)(micros() - last_micros) >= debouncing_time*1){
+    InterruptTwo();
+    last_micros = micros();
+  }
+}
+
+
+//---------------------------------------------------------------------------------------------------------
+void Interrupt() {
+  // Invertiere den Status: "Lass die LED blinken von HIGH auf LOW/ an auf aus"
+  stateOne = HIGH;
+  stateTwo = LOW;
+  
+}
+
+void InterruptTwo() {
+  // Invertiere den Status: "Lass die LED blinken von HIGH auf LOW/ an auf aus"
+  stateTwo = HIGH;
+  stateOne = LOW;
+}
+
 //---------------------------------------------------------------------------------------------------------
 void setup() {
   myservo.attach(9);
@@ -38,7 +71,9 @@ void setup() {
   // Lege den Pin für die LED als Outputpin fest
   pinMode(ledPinOne, OUTPUT);
   pinMode(ledPinTwo, OUTPUT);
-  
+  pinMode(ledPinWarning, OUTPUT);
+  digitalWrite(ledPinWarning, LOW);
+ 
   // Lege den Interruptpin als Inputpin mit Pullupwiderstand fest
   pinMode(interruptPinOne, INPUT_PULLUP);
   pinMode(interruptPinTwo, INPUT_PULLUP);
@@ -72,7 +107,6 @@ void loop() {
     delay(amplitude/2);
     myservo.write(95);  // set servo to mid-point
     delay(amplitude/2);
-    
   
   }
 
@@ -84,37 +118,13 @@ void loop() {
     delay(amplitude/3);
     myservo.write(95);  // set servo to mid-point
     delay(amplitude/3*2);
-
    
   }
-  
-}
-//---------------------------------------------------------------------------------------------------------
-void debounceInterrupt() {
-  if ((long)(micros() - last_micros) >= debouncing_time*1){
-    Interrupt();
-    last_micros = micros();
+
+  loopcount++;
+
+  if (loopcount == loopcount_warning){
+    digitalWrite(ledPinWarning, HIGH);
   }
-}
-
-void debounceInterruptTwo() {
-  if ((long)(micros() - last_micros) >= debouncing_time*1){
-    InterruptTwo();
-    last_micros = micros();
-  }
-}
-
-
-//---------------------------------------------------------------------------------------------------------
-void Interrupt() {
-  // Invertiere den Status: "Lass die LED blinken von HIGH auf LOW/ an auf aus"
-  stateOne = HIGH;
-  stateTwo = LOW;
   
-}
-
-void InterruptTwo() {
-  // Invertiere den Status: "Lass die LED blinken von HIGH auf LOW/ an auf aus"
-  stateTwo = HIGH;
-  stateOne = LOW;
 }
