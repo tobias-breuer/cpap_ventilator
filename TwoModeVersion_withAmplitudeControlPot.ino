@@ -3,38 +3,47 @@
 Servo myservo;
 
 
-int potpin = A0; // Analog Pin, an dem das Potentiometer angeschlossen ist
-int val; // Variable um den Vert des Analogen Pin zwischen zu speichern
+int potpin = A0; // analog Pin for potentiometer
+int val; // variable for value of potentiometer
 
-// Setze den Pin für die LED auf 13
-const byte ledPinOne = 13;
-const byte ledPinTwo = 6;
-const byte ledPinWarning = 5;
 
-// Setze Interruptpins
+const byte ledPinOne = 13; // define pin for LED 13
+const byte ledPinTwo = 6; // define pin for LED 6
+const byte ledPinWarning = 5; // define pin for LED 5
+
+// define interruptpins
 const byte interruptPinOne = 1;
 const byte interruptPinTwo = 0;
 const byte interruptPinThree = 7;
 
-// Definiere eine globale volatile Variable für den Status der LED
+// Define globale volatile variables for the status of the LEDs
 volatile byte stateOne = HIGH;
 volatile byte stateTwo = LOW;
 
+// to prevent debouncing define debounce time
 long debouncing_time = 50;
 volatile unsigned long last_micros;
-
+//in debouncing routine we need to use several timestamps
 long timestamp = 0;
 long timestamptwo = 0;
 long timeone = 1000;
 long timetwo = 2000;
-long timethree = 5000;
 
+//variable to define the duration of a breath-cycle
 long amplitude;
 
+//variable to count main-loops --> we want warning after defined number of loops
 long int loopcount = 0;
 long int loopcount_warning = 10;
+// if this flag is set by interrupt-routine, LED will blink and signal reset of loopcount
+bool blinking_warning = false;
+// define number of blinking for reset_warning
+int ResetBlinkRepititions = 5;
+
 
 //---------------------------------------------------------------------------------------------------------
+// interrupt-routine for first interrupt-button
+// has a debouncing routine and starts the actual interrupt function
 void debounceInterrupt() {
   if ((long)(micros() - last_micros) >= debouncing_time*1){
     Interrupt();
@@ -42,6 +51,9 @@ void debounceInterrupt() {
   }
 }
 
+
+// interrupt-routine for second interrupt-button
+// has a debouncing routine and starts the actual interrupt function
 void debounceInterruptTwo() {
   if ((long)(micros() - last_micros) >= debouncing_time*1){
     InterruptTwo();
@@ -51,24 +63,68 @@ void debounceInterruptTwo() {
 
 
 //---------------------------------------------------------------------------------------------------------
+// actual interrupt-routine for first interrupt-button
 void Interrupt() {
-  // Invertiere den Status: "Lass die LED blinken von HIGH auf LOW/ an auf aus"
+  // Invert status: LED from HIGH to LOW
   stateOne = HIGH;
   stateTwo = LOW;
   
+  //Serial.print("I1 started...");
+  
+  //check, if second interrupt pin is also pushed (for reset mode)
+  if (digitalRead(interruptPinTwo)==LOW){
+    reset_loop_warning();
+    //Serial.print("worked!");
+  }
+  
 }
-
+// actual interrupt-routine for second interrupt-button
 void InterruptTwo() {
-  // Invertiere den Status: "Lass die LED blinken von HIGH auf LOW/ an auf aus"
   stateTwo = HIGH;
   stateOne = LOW;
 }
 
+
+// routine to led LED blink
+void blinkLED(){
+  
+  for(int i=0; i<ResetBlinkRepititions; i++){
+    digitalWrite(ledPinWarning, HIGH);
+    delay(300);
+    digitalWrite(ledPinWarning, LOW);
+    delay(300);  
+  }
+
+  // reset blinking_warning flag to false
+  blinking_warning = false;
+  
+  //Serial.print("blinkLED finished");
+  
+}
+
+
 //---------------------------------------------------------------------------------------------------------
+// if both interrupts are pushed, this reset loop will reset loopcount variable and set the blinking flag
+void reset_loop_warning(){
+  
+  //Serial.print("start reset loop");
+  
+  // reset global loopcount variable to 0
+  loopcount = 0;
+  
+  // blink LED to signal resetting
+  blinking_warning = true;
+  
+}
+
+
+//---------------------------------------------------------------------------------------------------------
+
+// define starting setup
 void setup() {
   myservo.attach(9);
   
-  // Lege den Pin für die LED als Outputpin fest
+  // define pins of LEDs as outputpins
   pinMode(ledPinOne, OUTPUT);
   pinMode(ledPinTwo, OUTPUT);
   pinMode(ledPinWarning, OUTPUT);
@@ -88,7 +144,27 @@ void setup() {
 }
 
 
+// running mode one 
+// one to one ratio between inhalation and exhalation
+void modeOne(int amplitude){
+  myservo.write(0);  // set servo to mid-point
+  delay(amplitude/2);
+  myservo.write(95);  // set servo to mid-point
+  delay(amplitude/2);
+}
+
+// running mode two
+// one to two ratio between inhalation and exhalation
+void modeTwo(int amplitude){
+  myservo.write(0);  // set servo to mid-point
+  delay(amplitude/3);
+  myservo.write(95);  // set servo to mid-point
+  delay(amplitude/3*2);
+}
+
+
 //---------------------------------------------------------------------------------------------------------
+// main loop of the program
 void loop() {
   
   // Schalte die LEDs an
@@ -98,33 +174,32 @@ void loop() {
   val = analogRead(potpin); // liest das Potentiometer aus (Wert zwischen 0 und 1023)
   val = map(val, 0, 1023, 12, 26); // rechnet den Wert in den Wertebereich des Servomotors (zwischen 0 und180)
 
+  //duration of one breath-cycles per minute
+  // is adjusted with the potentiometer value between 12 and 26 cycles per minute
   amplitude = 60000/val;
-  Serial.print(amplitude);
+  
+  
   //routine for mode 1:
   if(stateOne){
-    
-    myservo.write(0);  // set servo to mid-point
-    delay(amplitude/2);
-    myservo.write(95);  // set servo to mid-point
-    delay(amplitude/2);
-  
+    modeOne(amplitude);
   }
 
   //routine for mode 2:
   if(stateTwo){
-
-
-    myservo.write(0);  // set servo to mid-point
-    delay(amplitude/3);
-    myservo.write(95);  // set servo to mid-point
-    delay(amplitude/3*2);
-   
+    modeTwo(amplitude);   
   }
 
+  //number of completed loops is increased after every loop
   loopcount++;
-
+  // as a warning the LED is turned off after defined number of loops
   if (loopcount == loopcount_warning){
     digitalWrite(ledPinWarning, HIGH);
+  }
+
+  //let LED blink warning if reset was done
+  if (blinking_warning == true){
+    blinkLED();
+    blinking_warning = false;
   }
   
 }
