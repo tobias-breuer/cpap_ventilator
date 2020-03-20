@@ -7,7 +7,10 @@ void setup() {
   pinMode(ledPinOne, OUTPUT);
   pinMode(ledPinTwo, OUTPUT);
   pinMode(ledPinWarning, OUTPUT);
+  pinMode(acousticPin, OUTPUT);
+  
   digitalWrite(ledPinWarning, LOW);
+  digitalWrite(acousticPin, LOW);
  
   // Lege den Interruptpin als Inputpin mit Pullupwiderstand fest
   pinMode(interruptPinOne, INPUT_PULLUP);
