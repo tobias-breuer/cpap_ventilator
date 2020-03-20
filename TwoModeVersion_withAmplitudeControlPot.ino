@@ -1,6 +1,8 @@
 #include <Servo.h> 
 
+
 Servo myservo;
+
 
 
 int potpin = A0; // analog Pin for potentiometer
@@ -39,128 +41,6 @@ long int loopcount_warning = 10;
 bool blinking_warning = false;
 // define number of blinking for reset_warning
 int ResetBlinkRepititions = 5;
-
-
-//---------------------------------------------------------------------------------------------------------
-// interrupt-routine for first interrupt-button
-// has a debouncing routine and starts the actual interrupt function
-void debounceInterrupt() {
-  if ((long)(micros() - last_micros) >= debouncing_time*1){
-    Interrupt();
-    last_micros = micros();
-  }
-}
-
-
-// interrupt-routine for second interrupt-button
-// has a debouncing routine and starts the actual interrupt function
-void debounceInterruptTwo() {
-  if ((long)(micros() - last_micros) >= debouncing_time*1){
-    InterruptTwo();
-    last_micros = micros();
-  }
-}
-
-
-//---------------------------------------------------------------------------------------------------------
-// actual interrupt-routine for first interrupt-button
-void Interrupt() {
-  // Invert status: LED from HIGH to LOW
-  stateOne = HIGH;
-  stateTwo = LOW;
-  
-  //Serial.print("I1 started...");
-  
-  //check, if second interrupt pin is also pushed (for reset mode)
-  if (digitalRead(interruptPinTwo)==LOW){
-    reset_loop_warning();
-    //Serial.print("worked!");
-  }
-  
-}
-// actual interrupt-routine for second interrupt-button
-void InterruptTwo() {
-  stateTwo = HIGH;
-  stateOne = LOW;
-}
-
-
-// routine to led LED blink
-void blinkLED(){
-  
-  for(int i=0; i<ResetBlinkRepititions; i++){
-    digitalWrite(ledPinWarning, HIGH);
-    delay(300);
-    digitalWrite(ledPinWarning, LOW);
-    delay(300);  
-  }
-
-  // reset blinking_warning flag to false
-  blinking_warning = false;
-  
-  //Serial.print("blinkLED finished");
-  
-}
-
-
-//---------------------------------------------------------------------------------------------------------
-// if both interrupts are pushed, this reset loop will reset loopcount variable and set the blinking flag
-void reset_loop_warning(){
-  
-  //Serial.print("start reset loop");
-  
-  // reset global loopcount variable to 0
-  loopcount = 0;
-  
-  // blink LED to signal resetting
-  blinking_warning = true;
-  
-}
-
-
-//---------------------------------------------------------------------------------------------------------
-
-// define starting setup
-void setup() {
-  myservo.attach(9);
-  
-  // define pins of LEDs as outputpins
-  pinMode(ledPinOne, OUTPUT);
-  pinMode(ledPinTwo, OUTPUT);
-  pinMode(ledPinWarning, OUTPUT);
-  digitalWrite(ledPinWarning, LOW);
- 
-  // Lege den Interruptpin als Inputpin mit Pullupwiderstand fest
-  pinMode(interruptPinOne, INPUT_PULLUP);
-  pinMode(interruptPinTwo, INPUT_PULLUP);
-  
-  // Lege die ISR 'blink' auf den Interruptpin mit Modus 'CHANGE':
-  // "Bei wechselnder Flanke auf dem Interruptpin" --> "Führe die ISR aus"
-  attachInterrupt(digitalPinToInterrupt(interruptPinOne), debounceInterrupt, FALLING);
-  attachInterrupt(digitalPinToInterrupt(interruptPinTwo), debounceInterruptTwo, FALLING);
-  myservo.write(0);
-  Serial.begin(9600);
-  long timestamp = 0;
-}
-
-
-// running mode one 
-// one to one ratio between inhalation and exhalation
-void modeOne(int amplitude){
-  myservo.write(0);  // set servo to mid-point
-  delay(amplitude/2);
-  myservo.write(95);  // set servo to mid-point
-  delay(amplitude/2);
-}
-
-// running mode two
-// one to two ratio between inhalation and exhalation
-void modeTwo(int amplitude){
-  myservo.write(0);  // set servo to mid-point
-  delay(amplitude/3);
-  myservo.write(95);  // set servo to mid-point
-  delay(amplitude/3*2);
-}
 
 
 //---------------------------------------------------------------------------------------------------------
