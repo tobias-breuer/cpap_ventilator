@@ -7,11 +7,16 @@ Servo myservo;
 volatile byte stateOne = HIGH;
 volatile byte stateTwo = LOW;
 
-
 // to prevent debouncing define debounce time
-const long debouncing_time = 50;
+const long debouncing_time = 100000;
 volatile unsigned long last_micros = 0;
 
+int interruptCountOne = 0;
+int interruptCountTwo = 0;
+
+/* Light barrier */
+bool lbBoolOne;
+bool lbBoolTwo;
 
 // variable to count main-loops --> we want warning after defined number of loops
 long int loopcount = 0;
@@ -22,12 +27,27 @@ bool blinking_warning_loopcount = false;
 const int ResetBlinkRepititions = 5;
 
 
+void acoustic_warning_loopcount() {
+  for (int i = 0; i < ResetBlinkRepititions; i++) {
+    digitalWrite(PIN_SPEAKER, HIGH);
+    delay(300);
+    digitalWrite(PIN_SPEAKER, LOW);
+    delay(300);
+  }
+}
 
-//---------------------------------------------------------------------------------------------------------
-// if both interrupts are pushed, this reset loop will reset loopcount variable and set the blinking flag
-void reset_loop_warning() {
-  // Serial.print("start reset loop");
+void acoustic_warning_lightBarrier() {
+  digitalWrite(PIN_SPEAKER, HIGH);
+  digitalWrite(PIN_LEDWARN, HIGH);
+}
 
+void reset_lightbarrier_warning() {
+  digitalWrite(PIN_LEDWARN, LOW);
+  digitalWrite(PIN_SPEAKER, LOW);
+}
+
+void reset_loopcount_warning() {
+  digitalWrite(PIN_SPEAKER, LOW);
   // reset global loopcount variable to 0
   loopcount = 0;
 
@@ -40,24 +60,35 @@ void reset_loop_warning() {
 // actual interrupt-routine for first interrupt-button
 void Interrupt() {
   // Invert status: LED from HIGH to LOW
-  stateOne = HIGH;
-  stateTwo = LOW;
+  stateOne = ! stateOne;  // invert state
+  stateTwo = ! stateTwo;
 
-  // Serial.print("I1 started...");
-
-  // check, if second interrupt pin is also pushed (for reset mode)
-  if (digitalRead(PIN_INTERRUPT2) == LOW) {
-    reset_loop_warning();
-    // Serial.print("worked!");
-  }
+  // Schalte die LEDs an
+  digitalWrite(PIN_LEDONE, stateOne);
+  digitalWrite(PIN_LEDTWO, stateTwo);
 }
 
 // actual interrupt-routine for second interrupt-button
 void InterruptTwo() {
-  stateTwo = HIGH;
-  stateOne = LOW;
+  long time_pressed = millis();
+
+  if ((long)(millis() - time_pressed) < 1000) {
+    // Serial.println("Reset Light Barrier");
+    reset_lightbarrier_warning();
+  }
+  if ((long)(millis() - time_pressed) >= 5000){  // Maybe find better times
+    // Serial.println("Reset LoopCounter");
+    reset_loopcount_warning();
+  }
 }
 
+void interrupt_commands() {
+  // XXX: unreachable code, interruptCount{One,Two} will never be changed
+  if (interruptCountOne == 1 && interruptCountTwo == 1) {
+    //digitalWrite(acousticPin, LOW);
+    digitalWrite(PIN_LEDWARN, LOW);
+  }
+}
 
 //---------------------------------------------------------------------------------------------------------
 // interrupt-routine for first interrupt-button
@@ -69,7 +100,6 @@ void debounceInterrupt() {
   }
 }
 
-
 // interrupt-routine for second interrupt-button
 // has a debouncing routine and starts the actual interrupt function
 void debounceInterruptTwo() {
@@ -78,7 +108,6 @@ void debounceInterruptTwo() {
     last_micros = micros();
   }
 }
-
 
 // routine to led LED blink
 void blinkLED_loopcount() {
@@ -103,8 +132,12 @@ void blinkLED_loopcount() {
 void modeOne(int amplitude) {
   myservo.write(0);  // set servo to mid-point
   delay(amplitude/2);
+  lbBoolOne = digitalRead(PIN_LIGHT);  // read boolean of light barrier
   myservo.write(95);  // set servo to mid-point
   delay(amplitude/2);
+  if (lbBoolOne == digitalRead(PIN_LIGHT)) {  // compare if boolean of light barrier
+    acoustic_warning_lightBarrier();  // make some noise if the light barrier didn't change
+  }
 }
 
 // running mode two
@@ -112,16 +145,11 @@ void modeOne(int amplitude) {
 void modeTwo(int amplitude) {
   myservo.write(0);  // set servo to mid-point
   delay(amplitude/3);
+  lbBoolTwo = digitalRead(PIN_LIGHT);  // read boolean of light barrier
   myservo.write(95);  // set servo to mid-point
   delay(amplitude/3*2);
-}
-
-void acoustic_warning_loopcount() {
-  for (int i = 0; i < ResetBlinkRepititions; i++) {
-    digitalWrite(PIN_SPEAKER, HIGH);
-    delay(300);
-    digitalWrite(PIN_SPEAKER, LOW);
-    delay(300);
+  if (lbBoolTwo == digitalRead(PIN_LIGHT)) {  // compare if boolean of light barrier
+    acoustic_warning_lightBarrier();  // make some noise if the light barrier didn't change
   }
 }
 
@@ -134,6 +162,7 @@ void setup() {
   pinMode(PIN_LEDTWO, OUTPUT);
   pinMode(PIN_LEDWARN, OUTPUT);
   pinMode(PIN_SPEAKER, OUTPUT);
+  pinMode(PIN_LIGHT, INPUT);  // XXX: will be overwritten later
 
   digitalWrite(PIN_LEDWARN, LOW);
   digitalWrite(PIN_SPEAKER, LOW);
@@ -141,6 +170,8 @@ void setup() {
   // Lege den Interruptpin als Inputpin mit Pullupwiderstand fest
   pinMode(PIN_INTERRUPT1, INPUT_PULLUP);
   pinMode(PIN_INTERRUPT2, INPUT_PULLUP);
+
+  pinMode(PIN_LIGHT, INPUT_PULLUP);
 
   // Lege die ISR 'blink' auf den Interruptpin mit Modus 'CHANGE':
   // "Bei wechselnder Flanke auf dem Interruptpin" --> "Führe die ISR aus"
@@ -165,6 +196,10 @@ inline int readAmplitude() {
 //---------------------------------------------------------------------------------------------------------
 // main loop of the program
 void loop() {
+  // Reset Interrupt Counters
+  interruptCountOne = 0;
+  interruptCountTwo = 0;
+
   // Schalte die LEDs an
   digitalWrite(PIN_LEDONE, stateOne);
   digitalWrite(PIN_LEDTWO, stateTwo);
@@ -190,8 +225,10 @@ void loop() {
   }
 
   // let LED blink warning if reset was done
-  if (blinking_warning_loopcount == true) {
+  if (blinking_warning_loopcount) {
     blinkLED_loopcount();
     blinking_warning_loopcount = false;
   }
+
+  interrupt_commands();
 }
