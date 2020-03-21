@@ -23,12 +23,15 @@ Servo myservo;
 const long debouncing_time = 100000;
 volatile unsigned long last_micros = 0;
 
+// TODO what is this exactly for?
 int interruptCountOne = 0;
 int interruptCountTwo = 0;
 
+// TODO why do we want those warnings? will the warning be reset later?
 // variable to count main-loops --> we want warning after defined number of loops
 long int loopcount = 0;
 const long int loopcount_warning = 10;
+
 // if this flag is set by interrupt-routine, LED will blink and signal reset of loopcount
 bool blinking_warning_loopcount = false;
 // define number of blinking for reset_warning
@@ -43,18 +46,6 @@ const int ResetBlinkRepititions = 5;
 int mode_sel_read_switch() {
   const bool switchVal = digitalRead(PIN_SWITCH1);
   mode_sel = (int) switchVal;
-  return mode_sel;
-}
-
-/**
- * Increment mode_sel safely and returns its new value.
- *
- * @return new value of mode_sel
- */
-int mode_sel_increment() {
-  if (++mode_sel >= mode_sizeof) {
-    mode_sel = 0;
-  }
   return mode_sel;
 }
 
@@ -91,10 +82,15 @@ void reset_loopcount_warning() {
 void InterruptTwo() {
   long time_pressed = millis();
 
+  Serial.print("[warn] interrupt two has fired at ");
+  Serial.println(time_pressed);
+
+  // TODO `millis() - time_pressed` is _always_ near 0; the following cannot work
   if ((long)(millis() - time_pressed) < 1000) {
     // Serial.println("Reset Light Barrier");
     reset_lightbarrier_warning();
   }
+  // TODO `millis` has advanced, if the first if has been fulfilled; those are heavy side effects!
   if ((long)(millis() - time_pressed) >= 5000) {  // Maybe find better times
     // Serial.println("Reset LoopCounter");
     reset_loopcount_warning();
@@ -102,7 +98,7 @@ void InterruptTwo() {
 }
 
 void interrupt_commands() {
-  // XXX: unreachable code, interruptCount{One,Two} will never be changed
+  // TODO: unreachable code, interruptCount{One,Two} will never be changed
   if (interruptCountOne == 1 && interruptCountTwo == 1) {
     //digitalWrite(acousticPin, LOW);
     digitalWrite(PIN_LEDWARN, LOW);
@@ -123,8 +119,8 @@ void blinkLED_loopcount() {
   for (int i = 0; i < ResetBlinkRepititions; i++) {
     digitalWrite(PIN_LEDWARN, HIGH);
     digitalWrite(PIN_SPEAKER, HIGH);
-
     delay(300);
+
     digitalWrite(PIN_LEDWARN, LOW);
     digitalWrite(PIN_SPEAKER, LOW);
     delay(300);
@@ -142,6 +138,13 @@ void blinkLED_loopcount() {
  * @param amplitude to determine the time.
  */
 void executeMode(const int amplitude) {
+  Serial.print("[info] execute mode (");
+  Serial.print(modes[mode_sel].mult_before);
+  Serial.print(",");
+  Serial.print(modes[mode_sel].mult_after);
+  Serial.print(") with amplitude of ");
+  Serial.println(amplitude);
+
   // Open tube and wait. TODO: verify if this opens
   Serial.println("[info] setting servo to 0");
   myservo.write(0);
@@ -171,7 +174,7 @@ void setup() {
   pinMode(PIN_LEDTWO, OUTPUT);
   pinMode(PIN_LEDWARN, OUTPUT);
   pinMode(PIN_SPEAKER, OUTPUT);
-  pinMode(PIN_LIGHT, INPUT);  // XXX: will be overwritten later
+  pinMode(PIN_LIGHT, INPUT);  // TODO: will be overwritten later
 
   digitalWrite(PIN_LEDWARN, LOW);
   digitalWrite(PIN_SPEAKER, LOW);
@@ -208,6 +211,7 @@ inline int readAmplitude() {
 //---------------------------------------------------------------------------------------------------------
 // main loop of the program
 void loop() {
+  // TODO: can this be removed?
   // Reset Interrupt Counters
   interruptCountOne = 0;
   interruptCountTwo = 0;
@@ -225,10 +229,14 @@ void loop() {
 
   executeMode(amplitude);
 
-  // number of completed loops is increased after every loop
-  loopcount++;
+  Serial.print("[info] finished loop iteration ");
+  Serial.println(++loopcount);
+
   // as a warning the LED is turned off after defined number of loops
+  // TODO: only == or >=, will the warning be removed?
   if (loopcount == loopcount_warning) {
+    Serial.println("[warn] reached loop count warning");
+
     digitalWrite(PIN_LEDWARN, HIGH);
     acoustic_warning_loopcount();
   }
