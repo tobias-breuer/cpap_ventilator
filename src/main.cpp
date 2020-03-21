@@ -151,15 +151,23 @@ void executeMode(const int amplitude) {
   delay(amplitude * modes[mode_sel].mult_before);
 
   // Read light sensor's state.
-  const bool lightSens = digitalRead(PIN_LIGHT);
+  // TODO: which value is expected? check also if this matches
+  const bool lightBefore = digitalRead(PIN_LIGHT);
+  Serial.print("[info] read light sensor: ");
+  Serial.println(lightBefore);
 
   // Close tube and wait again.
   Serial.println("[info] setting servo to 95");
   myservo.write(95);
   delay(amplitude * modes[mode_sel].mult_after);
 
+  const bool lightAfter = digitalRead(PIN_LIGHT);
+  Serial.print("[info] read light sensor: ");
+  Serial.println(lightAfter);
+  //
   // Alert iff light sensor has not changed afterwards.
-  if (lightSens == digitalRead(PIN_LIGHT)) {
+  if (lightBefore == lightAfter) {
+    // TODO: is it possible to reset warnings?
     Serial.println("[warn] light sensor value has NOT changed!");
     acoustic_warning_lightBarrier();
   }
