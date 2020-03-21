@@ -7,19 +7,6 @@ Servo myservo;
 int potpin = A0;  // analog Pin
 int val;  // variable for value of potentiometer
 
-/* LED pins */
-const byte ledPinOne = 13;  // define pin for LED 13
-const byte ledPinTwo = 6;  // define pin for LED 6
-const byte ledPinWarning = 5;  // define pin for LED 5
-
-const byte acousticPin = 3;  // define pin for acoustic signal
-
-/* Interrupt pins */
-const byte interruptPinOne = 1;
-const byte interruptPinTwo = 0;
-const byte interruptPinThree = 7;
-
-
 // Define globale volatile variables for the status of the LEDs
 volatile byte stateOne = HIGH;
 volatile byte stateTwo = LOW;
@@ -71,7 +58,7 @@ void Interrupt() {
   // Serial.print("I1 started...");
 
   // check, if second interrupt pin is also pushed (for reset mode)
-  if (digitalRead(interruptPinTwo) == LOW) {
+  if (digitalRead(PIN_INTERRUPT2) == LOW) {
     reset_loop_warning();
     // Serial.print("worked!");
   }
@@ -108,12 +95,12 @@ void debounceInterruptTwo() {
 // routine to led LED blink
 void blinkLED_loopcount() {
   for (int i = 0; i < ResetBlinkRepititions; i++) {
-    digitalWrite(ledPinWarning, HIGH);
-    digitalWrite(acousticPin, HIGH);
+    digitalWrite(PIN_LEDWARN, HIGH);
+    digitalWrite(PIN_SPEAKER, HIGH);
 
     delay(300);
-    digitalWrite(ledPinWarning, LOW);
-    digitalWrite(acousticPin, LOW);
+    digitalWrite(PIN_LEDWARN, LOW);
+    digitalWrite(PIN_SPEAKER, LOW);
     delay(300);
   }
 
@@ -143,34 +130,34 @@ void modeTwo(int amplitude) {
 
 void acoustic_warning_loopcount() {
   for (int i = 0; i < ResetBlinkRepititions; i++) {
-    digitalWrite(acousticPin, HIGH);
+    digitalWrite(PIN_SPEAKER, HIGH);
     delay(300);
-    digitalWrite(acousticPin, LOW);
+    digitalWrite(PIN_SPEAKER, LOW);
     delay(300);
   }
 }
 
 // define starting setup
 void setup() {
-  myservo.attach(9);
+  myservo.attach(PIN_SERVO);
 
   // define pins of LEDs as outputpins
-  pinMode(ledPinOne, OUTPUT);
-  pinMode(ledPinTwo, OUTPUT);
-  pinMode(ledPinWarning, OUTPUT);
-  pinMode(acousticPin, OUTPUT);
+  pinMode(PIN_LEDONE, OUTPUT);
+  pinMode(PIN_LEDTWO, OUTPUT);
+  pinMode(PIN_LEDWARN, OUTPUT);
+  pinMode(PIN_SPEAKER, OUTPUT);
 
-  digitalWrite(ledPinWarning, LOW);
-  digitalWrite(acousticPin, LOW);
+  digitalWrite(PIN_LEDWARN, LOW);
+  digitalWrite(PIN_SPEAKER, LOW);
 
   // Lege den Interruptpin als Inputpin mit Pullupwiderstand fest
-  pinMode(interruptPinOne, INPUT_PULLUP);
-  pinMode(interruptPinTwo, INPUT_PULLUP);
+  pinMode(PIN_INTERRUPT1, INPUT_PULLUP);
+  pinMode(PIN_INTERRUPT2, INPUT_PULLUP);
 
   // Lege die ISR 'blink' auf den Interruptpin mit Modus 'CHANGE':
   // "Bei wechselnder Flanke auf dem Interruptpin" --> "Führe die ISR aus"
-  attachInterrupt(digitalPinToInterrupt(interruptPinOne), debounceInterrupt, FALLING);
-  attachInterrupt(digitalPinToInterrupt(interruptPinTwo), debounceInterruptTwo, FALLING);
+  attachInterrupt(digitalPinToInterrupt(PIN_INTERRUPT1), debounceInterrupt, FALLING);
+  attachInterrupt(digitalPinToInterrupt(PIN_INTERRUPT2), debounceInterruptTwo, FALLING);
   myservo.write(0);
   // Serial.begin(9600);
   // long timestamp = 0;
@@ -180,8 +167,8 @@ void setup() {
 // main loop of the program
 void loop() {
   // Schalte die LEDs an
-  digitalWrite(ledPinOne, stateOne);
-  digitalWrite(ledPinTwo, stateTwo);
+  digitalWrite(PIN_LEDONE, stateOne);
+  digitalWrite(PIN_LEDTWO, stateTwo);
 
   val = analogRead(potpin);  // liest das Potentiometer aus (Wert zwischen 0 und 1023)
   val = map(val, 0, 1023, 8, 30);  // rechnet den Wert in den Wertebereich des Servomotors (zwischen 0 und180)
@@ -205,7 +192,7 @@ void loop() {
   loopcount++;
   // as a warning the LED is turned off after defined number of loops
   if (loopcount == loopcount_warning) {
-    digitalWrite(ledPinWarning, HIGH);
+    digitalWrite(PIN_LEDWARN, HIGH);
     acoustic_warning_loopcount();
   }
 
