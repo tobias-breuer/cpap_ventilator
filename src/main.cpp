@@ -35,6 +35,18 @@ bool blinking_warning_loopcount = false;
 const int ResetBlinkRepititions = 5;
 
 /**
+ * Read PIN_SWITCH1 and sets mode_sel to its value.
+ * This requires that sizeof(modes) >= 2 or, even better, == 2.
+ *
+ * @return new value of mode_sel
+ */
+int mode_sel_read_switch() {
+  const bool switchVal = digitalRead(PIN_SWITCH1);
+  mode_sel = (int) switchVal;
+  return mode_sel;
+}
+
+/**
  * Increment mode_sel safely and returns its new value.
  *
  * @return new value of mode_sel
@@ -75,13 +87,6 @@ void reset_loopcount_warning() {
 }
 
 
-//---------------------------------------------------------------------------------------------------------
-// actual interrupt-routine for first interrupt-button
-void Interrupt() {
-  // switch mode
-  mode_sel_increment();
-}
-
 // actual interrupt-routine for second interrupt-button
 void InterruptTwo() {
   long time_pressed = millis();
@@ -101,16 +106,6 @@ void interrupt_commands() {
   if (interruptCountOne == 1 && interruptCountTwo == 1) {
     //digitalWrite(acousticPin, LOW);
     digitalWrite(PIN_LEDWARN, LOW);
-  }
-}
-
-//---------------------------------------------------------------------------------------------------------
-// interrupt-routine for first interrupt-button
-// has a debouncing routine and starts the actual interrupt function
-void debounceInterrupt() {
-  if ((long)(micros() - last_micros) >= debouncing_time*1) {
-    Interrupt();
-    last_micros = micros();
   }
 }
 
@@ -148,6 +143,7 @@ void blinkLED_loopcount() {
  */
 void executeMode(const int amplitude) {
   // Open tube and wait. TODO: verify if this opens
+  Serial.println("[info] setting servo to 0");
   myservo.write(0);
   delay(amplitude * modes[mode_sel].mult_before);
 
@@ -155,11 +151,13 @@ void executeMode(const int amplitude) {
   const bool lightSens = digitalRead(PIN_LIGHT);
 
   // Close tube and wait again.
+  Serial.println("[info] setting servo to 95");
   myservo.write(95);
   delay(amplitude * modes[mode_sel].mult_after);
 
   // Alert iff light sensor has not changed afterwards.
   if (lightSens == digitalRead(PIN_LIGHT)) {
+    Serial.println("[warn] light sensor value has NOT changed!");
     acoustic_warning_lightBarrier();
   }
 }
@@ -179,16 +177,19 @@ void setup() {
   digitalWrite(PIN_SPEAKER, LOW);
 
   // Lege den Interruptpin als Inputpin mit Pullupwiderstand fest
-  pinMode(PIN_INTERRUPT1, INPUT_PULLUP);
-  pinMode(PIN_INTERRUPT2, INPUT_PULLUP);
+  pinMode(PIN_SWITCH1, INPUT_PULLUP);
+  pinMode(PIN_SWITCH2, INPUT_PULLUP);
 
   pinMode(PIN_LIGHT, INPUT_PULLUP);
 
   // Lege die ISR 'blink' auf den Interruptpin mit Modus 'CHANGE':
   // "Bei wechselnder Flanke auf dem Interruptpin" --> "Führe die ISR aus"
-  attachInterrupt(digitalPinToInterrupt(PIN_INTERRUPT1), debounceInterrupt, FALLING);
-  attachInterrupt(digitalPinToInterrupt(PIN_INTERRUPT2), debounceInterruptTwo, FALLING);
+  attachInterrupt(digitalPinToInterrupt(PIN_SWITCH2), debounceInterruptTwo, FALLING);
+
   myservo.write(0);
+
+  Serial.begin(9600);
+  Serial.println("[info] CPAP booting up...");
 }
 
 /**
@@ -211,11 +212,17 @@ void loop() {
   interruptCountOne = 0;
   interruptCountTwo = 0;
 
+  Serial.print("[info] read mode from switch: ");
+  Serial.println(mode_sel_read_switch());
+
   // enable LED 1 if first mode is select; same for LED 2 / second mode
   digitalWrite(PIN_LEDONE, mode_sel == 0);
   digitalWrite(PIN_LEDTWO, mode_sel == 1);
 
   const int amplitude = readAmplitude();
+  Serial.print("[info] read amplitude: ");
+  Serial.println(amplitude);
+
   executeMode(amplitude);
 
   // number of completed loops is increased after every loop
