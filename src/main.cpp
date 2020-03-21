@@ -3,10 +3,6 @@
 
 Servo myservo;
 
-/* Potentiometer */
-int potpin = A0;  // analog Pin
-int val;  // variable for value of potentiometer
-
 // Define globale volatile variables for the status of the LEDs
 volatile byte stateOne = HIGH;
 volatile byte stateTwo = LOW;
@@ -21,9 +17,6 @@ long timestamptwo = 0;
 long timeone = 1000;
 long timetwo = 2000;
 
-
-// variable to define the duration of a breath-cycle
-long amplitude;
 
 // variable to count main-loops --> we want warning after defined number of loops
 long int loopcount = 0;
@@ -163,6 +156,19 @@ void setup() {
   // long timestamp = 0;
 }
 
+/**
+ * Read the potentiometer's value, map it between 8 and 30 and convert it to
+ * the amplitude.
+ *
+ * TODO: check and motivate the const values below
+ *
+ * @return amplitude calculated from the potentiometer
+ */
+inline int readAmplitude() {
+  int rawVal = analogRead(PIN_POTI);
+  return 60000/map(rawVal, 0, 1023, 8, 30);
+}
+
 //---------------------------------------------------------------------------------------------------------
 // main loop of the program
 void loop() {
@@ -170,13 +176,7 @@ void loop() {
   digitalWrite(PIN_LEDONE, stateOne);
   digitalWrite(PIN_LEDTWO, stateTwo);
 
-  val = analogRead(potpin);  // liest das Potentiometer aus (Wert zwischen 0 und 1023)
-  val = map(val, 0, 1023, 8, 30);  // rechnet den Wert in den Wertebereich des Servomotors (zwischen 0 und180)
-
-  // duration of one breath-cycles per minute
-  // is adjusted with the potentiometer value between 12 and 26 cycles per minute
-  amplitude = 60000/val;
-
+  int amplitude = readAmplitude();
 
   // routine for mode 1:
   if (stateOne) {
