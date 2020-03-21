@@ -1,11 +1,23 @@
 #include <Arduino.h>
 #include <Servo.h>
 
-Servo myservo;
+/**
+ * There are different modes to be operated. Each mode has a different
+ * multiplier for the delay before and after operating the servo.
+ */
+struct mode_t {
+  double mult_before;
+  double mult_after;
+};
 
-// Define globale volatile variables for the status of the LEDs
-volatile byte stateOne = HIGH;
-volatile byte stateTwo = LOW;
+const int mode_sizeof = 2;
+const mode_t modes[mode_sizeof] = {
+  mode_t{0.5, 0.5},
+  mode_t{0.33, 0.66},
+};
+volatile int mode_sel = 0;
+
+Servo myservo;
 
 // to prevent debouncing define debounce time
 const long debouncing_time = 100000;
@@ -13,10 +25,6 @@ volatile unsigned long last_micros = 0;
 
 int interruptCountOne = 0;
 int interruptCountTwo = 0;
-
-/* Light barrier */
-bool lbBoolOne;
-bool lbBoolTwo;
 
 // variable to count main-loops --> we want warning after defined number of loops
 long int loopcount = 0;
@@ -26,6 +34,17 @@ bool blinking_warning_loopcount = false;
 // define number of blinking for reset_warning
 const int ResetBlinkRepititions = 5;
 
+/**
+ * Increment mode_sel safely and returns its new value.
+ *
+ * @return new value of mode_sel
+ */
+int mode_sel_increment() {
+  if (++mode_sel >= mode_sizeof) {
+    mode_sel = 0;
+  }
+  return mode_sel;
+}
 
 void acoustic_warning_loopcount() {
   for (int i = 0; i < ResetBlinkRepititions; i++) {
@@ -59,13 +78,8 @@ void reset_loopcount_warning() {
 //---------------------------------------------------------------------------------------------------------
 // actual interrupt-routine for first interrupt-button
 void Interrupt() {
-  // Invert status: LED from HIGH to LOW
-  stateOne = ! stateOne;  // invert state
-  stateTwo = ! stateTwo;
-
-  // Schalte die LEDs an
-  digitalWrite(PIN_LEDONE, stateOne);
-  digitalWrite(PIN_LEDTWO, stateTwo);
+  // switch mode
+  mode_sel_increment();
 }
 
 // actual interrupt-routine for second interrupt-button
@@ -76,7 +90,7 @@ void InterruptTwo() {
     // Serial.println("Reset Light Barrier");
     reset_lightbarrier_warning();
   }
-  if ((long)(millis() - time_pressed) >= 5000){  // Maybe find better times
+  if ((long)(millis() - time_pressed) >= 5000) {  // Maybe find better times
     // Serial.println("Reset LoopCounter");
     reset_loopcount_warning();
   }
@@ -127,29 +141,26 @@ void blinkLED_loopcount() {
   // Serial.print("blinkLED finished");
 }
 
-// running mode one
-// one to one ratio between inhalation and exhalation
-void modeOne(int amplitude) {
-  myservo.write(0);  // set servo to mid-point
-  delay(amplitude/2);
-  lbBoolOne = digitalRead(PIN_LIGHT);  // read boolean of light barrier
-  myservo.write(95);  // set servo to mid-point
-  delay(amplitude/2);
-  if (lbBoolOne == digitalRead(PIN_LIGHT)) {  // compare if boolean of light barrier
-    acoustic_warning_lightBarrier();  // make some noise if the light barrier didn't change
-  }
-}
+/**
+ * Open and close the tube with the mode's specific delays.
+ *
+ * @param amplitude to determine the time.
+ */
+void executeMode(const int amplitude) {
+  // Open tube and wait. TODO: verify if this opens
+  myservo.write(0);
+  delay(amplitude * modes[mode_sel].mult_before);
 
-// running mode two
-// one to two ratio between inhalation and exhalation
-void modeTwo(int amplitude) {
-  myservo.write(0);  // set servo to mid-point
-  delay(amplitude/3);
-  lbBoolTwo = digitalRead(PIN_LIGHT);  // read boolean of light barrier
-  myservo.write(95);  // set servo to mid-point
-  delay(amplitude/3*2);
-  if (lbBoolTwo == digitalRead(PIN_LIGHT)) {  // compare if boolean of light barrier
-    acoustic_warning_lightBarrier();  // make some noise if the light barrier didn't change
+  // Read light sensor's state.
+  const bool lightSens = digitalRead(PIN_LIGHT);
+
+  // Close tube and wait again.
+  myservo.write(95);
+  delay(amplitude * modes[mode_sel].mult_after);
+
+  // Alert iff light sensor has not changed afterwards.
+  if (lightSens == digitalRead(PIN_LIGHT)) {
+    acoustic_warning_lightBarrier();
   }
 }
 
@@ -200,21 +211,12 @@ void loop() {
   interruptCountOne = 0;
   interruptCountTwo = 0;
 
-  // Schalte die LEDs an
-  digitalWrite(PIN_LEDONE, stateOne);
-  digitalWrite(PIN_LEDTWO, stateTwo);
+  // enable LED 1 if first mode is select; same for LED 2 / second mode
+  digitalWrite(PIN_LEDONE, mode_sel == 0);
+  digitalWrite(PIN_LEDTWO, mode_sel == 1);
 
-  int amplitude = readAmplitude();
-
-  // routine for mode 1:
-  if (stateOne) {
-    modeOne(amplitude);
-  }
-
-  // routine for mode 2:
-  if (stateTwo) {
-    modeTwo(amplitude);
-  }
+  const int amplitude = readAmplitude();
+  executeMode(amplitude);
 
   // number of completed loops is increased after every loop
   loopcount++;
