@@ -10,3 +10,4 @@
 .pio
 
 # End of https://www.gitignore.io/api/platformio
+.vscode/
