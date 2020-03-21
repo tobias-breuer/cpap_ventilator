@@ -9,22 +9,17 @@ volatile byte stateTwo = LOW;
 
 
 // to prevent debouncing define debounce time
-long debouncing_time = 50;
-volatile unsigned long last_micros;
-// in debouncing routine we need to use several timestamps
-long timestamp = 0;
-long timestamptwo = 0;
-long timeone = 1000;
-long timetwo = 2000;
+const long debouncing_time = 50;
+volatile unsigned long last_micros = 0;
 
 
 // variable to count main-loops --> we want warning after defined number of loops
 long int loopcount = 0;
-long int loopcount_warning = 10;
+const long int loopcount_warning = 10;
 // if this flag is set by interrupt-routine, LED will blink and signal reset of loopcount
 bool blinking_warning_loopcount = false;
 // define number of blinking for reset_warning
-int ResetBlinkRepititions = 5;
+const int ResetBlinkRepititions = 5;
 
 
 
@@ -152,8 +147,6 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(PIN_INTERRUPT1), debounceInterrupt, FALLING);
   attachInterrupt(digitalPinToInterrupt(PIN_INTERRUPT2), debounceInterruptTwo, FALLING);
   myservo.write(0);
-  // Serial.begin(9600);
-  // long timestamp = 0;
 }
 
 /**
