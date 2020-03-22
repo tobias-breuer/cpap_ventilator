@@ -27,10 +27,9 @@ volatile unsigned long last_micros = 0;
 int interruptCountOne = 0;
 int interruptCountTwo = 0;
 
-// TODO why do we want those warnings? will the warning be reset later?
-// variable to count main-loops --> we want warning after defined number of loops
-long int loopcount = 0;
-const long int loopcount_warning = 10;
+// Counter for the amount of processed loops. This is necessary to raise a
+// warning if some threshold is passed, configured as MAX_LOOP_COUNT.
+volatile long int loop_count = 0;
 
 // if this flag is set by interrupt-routine, LED will blink and signal reset of loopcount
 bool blinking_warning_loopcount = false;
@@ -71,7 +70,7 @@ void reset_lightbarrier_warning() {
 void reset_loopcount_warning() {
   digitalWrite(PIN_SPEAKER, LOW);
   // reset global loopcount variable to 0
-  loopcount = 0;
+  loop_count = 0;
 
   // blink LED to signal resetting
   blinking_warning_loopcount = true;
@@ -238,11 +237,10 @@ void loop() {
   executeMode(amplitude);
 
   Serial.print("[info] finished loop iteration ");
-  Serial.println(++loopcount);
+  Serial.println(++loop_count);
 
-  // as a warning the LED is turned off after defined number of loops
-  // TODO: only == or >=, will the warning be removed?
-  if (loopcount == loopcount_warning) {
+  // warn if loopcount is greater than MAX_LOOP_COUNT
+  if (loop_count >= MAX_LOOP_COUNT) {
     Serial.println("[warn] reached loop count warning");
 
     digitalWrite(PIN_LEDWARN, HIGH);
