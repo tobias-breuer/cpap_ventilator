@@ -4,21 +4,8 @@
 #include <LiquidCrystal_I2C.h>
 #include <Servo.h>
 
-/**
- * There are different modes to be operated. Each mode has a different
- * multiplier for the delay before and after operating the servo.
- */
-struct mode_t {
-  double mult_inhale;
-  double mult_exhale;
-};
-
-const int mode_sizeof = 2;
-const mode_t modes[mode_sizeof] = {
-  mode_t{0.5, 0.5},
-  mode_t{0.33, 0.66},
-};
-volatile int mode = 0;
+#include "./mode.h"
+#include "./servo_count.h"
 
 float breaths_per_minute;
 
@@ -27,34 +14,26 @@ Servo servo;
 LiquidCrystal_I2C lcd(0x27);
 
 /**
- * Reset the internal servo counter in the EEPROM.
- */
-void servo_count_reset() {
-  long unsigned int servo_count = 0;
-  EEPROM.put(0, servo_count);
-}
-
-/**
- * Read the servo counter from the EEPROM and writes its increment back.
+ * Reset the device's state to a factory mode.
  *
- * This is a counter for the amount of processed servo interactions and
- * necessary to raise a warning if a threshold is passed, configured as
- * MAX_SERVO_COUNT.
- *
- * @return incremented servo counter
+ * This implies a reset of all LEDs and the servo counter in the EEPROM.
+ * This function should be called after the replacement of some hardware.
  */
-long unsigned int servo_count_fetch() {
-  long unsigned int servo_count = 0;
-  EEPROM.get(0, servo_count);
-  EEPROM.put(0, servo_count + 1);
-  return servo_count;
-}
+void reset_cpap() {
+  Serial.println("[warn] entering reset_cpap function, cleaning all data...");
 
+  servo_count_reset();
+
+  digitalWrite(PIN_LED_MODE_ONE, 0);
+  digitalWrite(PIN_LED_MODE_TWO, 0);
+  digitalWrite(PIN_LED_WARN, 0);
+  digitalWrite(PIN_SPEAKER, 0);
+
+  Serial.println("[warn] finished reset_cpap function");
+}
 
 /**
  * Open and close the tube with the mode's specific delays.
- *
- * @param amplitude to determine the time.
  */
 void executeCycle() {
   Serial.print("[info] execute mode (");
@@ -89,15 +68,17 @@ void executeCycle() {
   const bool lightAfter = digitalRead(PIN_LIGHT);
   Serial.print("[info] read light sensor: ");
   Serial.println(lightAfter);
-  //
+
   // Alert iff light sensor has not changed afterwards.
   if (lightBefore == lightAfter) {
-    // TODO: is it possible to reset warnings?
     Serial.println("[warn] light sensor value has NOT changed!");
+    digitalWrite(PIN_LED_WARN, HIGH);
   }
 }
 
-// define starting setup
+/**
+ * Setup the CPAP device. This function is run once while booting up.
+ */
 void setup() {
   Serial.begin(9600);
   Serial.println("[info] CPAP ventilator booting up...");
@@ -146,11 +127,11 @@ inline float read_frequency() {
 
   Serial.print(" resulting in ");
   // map the values of the poti to the breaths per minute
-  // map() cannot be used, since it only works for int values 
+  // map() cannot be used, since it only works for int values
   breaths_per_minute = (poti - POTI_MIN) * (BPM_MAX - BPM_MIN) / (POTI_MAX - POTI_MIN) + BPM_MIN;
   Serial.print(breaths_per_minute);
   Serial.println(" breaths per minute.");
-  
+
   return breaths_per_minute;
 }
 
@@ -167,8 +148,9 @@ inline void display_status() {
   lcd.print(modes[mode].mult_exhale);
 }
 
-//---------------------------------------------------------------------------------------------------------
-// main loop of the program
+/**
+ * Main loop, which is called endlessly during execution.
+ */
 void loop() {
   long unsigned int servo_count = servo_count_fetch();
   Serial.print("[info] start servo count iteration ");
@@ -186,11 +168,15 @@ void loop() {
   display_status();
   executeCycle();
 
-  // warn if servo_count is greater than MAX_SERVO_COUNT 
+  // warn if servo_count is greater than MAX_SERVO_COUNT
   if (servo_count >= MAX_SERVO_COUNT) {
     Serial.println("[warn] reached servo count threshold");
-
     digitalWrite(PIN_LED_WARN, HIGH);
   }
 
+  // reset the device if the reset button is pressed
+  // TODO: check if it pressed longer, e.g., for two samples
+  if (digitalRead(PIN_BUTTON_RESET)) {
+    reset_cpap();
+  }
 }
