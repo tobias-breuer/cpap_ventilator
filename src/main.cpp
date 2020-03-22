@@ -203,7 +203,7 @@ void loop() {
   }
 
   // reset the device if the reset button is pressed
-  if (digitalRead(PIN_BUTTON_RESET)) {
+  if (!digitalRead(PIN_BUTTON_RESET)) {
     reset_cpap();
   }
 }
