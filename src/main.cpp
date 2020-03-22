@@ -6,74 +6,31 @@
 #include "./mode.h"
 #include "./servo_count.h"
 
-float breaths_per_minute;
+/* Signatures of all following functions */
+inline void display_status();
+inline void read_frequency();
+inline void read_mode();
+void loop();
+void reset_cpap();
+void setup();
+void state_close();
+void state_open();
 
+/* Reference to the LCD and servo */
+LiquidCrystal_I2C lcd(0x27);
 Servo servo;
 
-LiquidCrystal_I2C lcd(0x27);
+/* Variable to measure the breaths per minute */
+volatile float breaths_per_minute;
 
-/**
- * Reset the device's state to a factory mode.
- *
- * This implies a reset of all LEDs and the servo counter in the EEPROM.
- * This function should be called after the replacement of some hardware.
+/* Variables for the next state:
+ * - timestamp (ms) of next execution
+ * - previous value of the light barrier
+ * - pointer to next state function
  */
-void reset_cpap() {
-  Serial.println("[warn] entering reset_cpap function, cleaning all data...");
-
-  servo_count_reset();
-
-  digitalWrite(PIN_LED_MODE_ONE, 0);
-  digitalWrite(PIN_LED_MODE_TWO, 0);
-  digitalWrite(PIN_LED_WARN, 0);
-  digitalWrite(PIN_SPEAKER, 0);
-
-  Serial.println("[warn] finished reset_cpap function");
-}
-
-/**
- * Open and close the tube with the mode's specific delays.
- */
-void executeCycle() {
-  Serial.print("[info] execute mode (");
-  Serial.print(modes[mode].mult_inhale);
-  Serial.print(", ");
-  Serial.print(modes[mode].mult_exhale);
-  Serial.print(") with breathing frequency of ");
-  Serial.println(breaths_per_minute);
-
-  // Open tube and wait. TODO: verify if this opens
-  float inhale_delay_ms = 60000 / breaths_per_minute * modes[mode].mult_inhale;
-  Serial.print("[info] setting servo to 0 for ");
-  Serial.print(inhale_delay_ms);
-  Serial.println("ms");
-  servo.write(0);
-  delay(inhale_delay_ms);
-
-  // Read light sensor's state.
-  // TODO: which value is expected? check also if this matches
-  const bool lightBefore = digitalRead(PIN_LIGHT);
-  Serial.print("[info] read light sensor: ");
-  Serial.println(lightBefore);
-
-  // Close tube and wait again.
-  float exhale_delay_ms = 60000 / breaths_per_minute * modes[mode].mult_exhale;
-  Serial.print("[info] setting servo to 95 for ");
-  Serial.print(exhale_delay_ms);
-  Serial.println("ms");
-  servo.write(95);
-  delay(exhale_delay_ms);
-
-  const bool lightAfter = digitalRead(PIN_LIGHT);
-  Serial.print("[info] read light sensor: ");
-  Serial.println(lightAfter);
-
-  // Alert iff light sensor has not changed afterwards.
-  if (lightBefore == lightAfter) {
-    Serial.println("[warn] light sensor value has NOT changed!");
-    digitalWrite(PIN_LED_WARN, HIGH);
-  }
-}
+volatile unsigned long next_state_time = 0;
+volatile bool next_state_light_barrier = false;
+void (*next_state_fun)() = state_open;
 
 /**
  * Setup the CPAP device. This function is run once while booting up.
@@ -109,34 +66,55 @@ void setup() {
 }
 
 /**
- * Read the potentiometer's value, map it between 8 and 30 and convert it to
- * the amplitude.
+ * Reset the device's state to a factory mode.
  *
- * TODO: check and motivate the const values below
- *
- * @return amplitude calculated from the potentiometer
+ * This implies a reset of all LEDs and the servo counter in the EEPROM.
+ * This function should be called after the replacement of some hardware.
  */
-inline float read_frequency() {
-  Serial.print("[info] Reading potentiometer: ");
+void reset_cpap() {
+  Serial.println("[warn] entering reset_cpap function, cleaning all data...");
 
-  float poti = analogRead(PIN_POTI);
-  Serial.print(poti);
-  Serial.print("/");
-  Serial.print(POTI_MAX);
+  servo_count_reset();
 
-  Serial.print(" resulting in ");
-  // map the values of the poti to the breaths per minute
-  // map() cannot be used, since it only works for int values
-  breaths_per_minute = (poti - POTI_MIN) * (BPM_MAX - BPM_MIN) / (POTI_MAX - POTI_MIN) + BPM_MIN;
-  Serial.print(breaths_per_minute);
-  Serial.println(" breaths per minute.");
+  digitalWrite(PIN_LED_MODE_ONE, 0);
+  digitalWrite(PIN_LED_MODE_TWO, 0);
+  digitalWrite(PIN_LED_WARN, 0);
+  digitalWrite(PIN_SPEAKER, 0);
 
-  return breaths_per_minute;
+  Serial.println("[warn] finished reset_cpap function");
+
+  // "debounce" button
+  delay(1000);
 }
 
-inline void display_status() {
-  Serial.println("[info] updating display.");
+/**
+ * Read the mode from the slide switch and notify potential updates.
+ */
+inline void read_mode() {
+  const int tmp_mode = digitalRead(PIN_SWITCH_MODE);
+  if (tmp_mode != mode) {
+    mode = tmp_mode;
 
+    Serial.print("[info] update mode to ");
+    Serial.println(mode);
+  }
+}
+
+/**
+ * Read the potentiometer's value and convert it to breaths per minute.
+ */
+inline void read_frequency() {
+  // map the values of the poti to the breaths per minute
+  // map() cannot be used, since it only works for int values
+
+  const float poti = analogRead(PIN_POTI);
+  breaths_per_minute = (poti - POTI_MIN) * (BPM_MAX - BPM_MIN) / (POTI_MAX - POTI_MIN) + BPM_MIN;
+}
+
+/**
+ * Display the state on an external LCD display.
+ */
+inline void display_status() {
   lcd.home();
   lcd.print("Breaths/Min: ");
   lcd.print(breaths_per_minute);
@@ -148,33 +126,83 @@ inline void display_status() {
 }
 
 /**
+ * In this state the servo opens the tube.
+ */
+void state_open() {
+  Serial.println("[info] starting opening servo state");
+
+  servo.write(SERVO_OPEN);
+
+  // Calculate the next state execution time, for closing.
+  // Subtract the SERVO_CLOSE_LATENCY because of the delay while closing.
+  const float offset = 60000.0 / breaths_per_minute * modes[mode].mult_inhale - SERVO_CLOSE_LATENCY;
+  next_state_time = millis() + (unsigned long) offset;
+
+  next_state_fun = state_close;
+
+  Serial.print("[info] scheduled closing state to be executed in ");
+  Serial.print(offset);
+  Serial.println(" ms");
+}
+
+/**
+ * In this state the servo closes the tube.
+ */
+void state_close() {
+  Serial.println("[info] starting closing servo state");
+
+  servo.write(SERVO_CLOSE);
+
+  Serial.print("[info] finished servo count iteration number ");
+  Serial.println(servo_count_increment());
+
+  // Calculate the next state execution time, for opening.
+  const float offset = 60000.0 / breaths_per_minute * modes[mode].mult_exhale;
+  next_state_time = millis() + (unsigned long) offset;
+
+  next_state_fun = state_open;
+
+  Serial.print("[info] scheduled opening state to be executed in ");
+  Serial.print(offset);
+  Serial.println(" ms");
+}
+
+/**
  * Main loop, which is called endlessly during execution.
  */
 void loop() {
-  long unsigned int servo_count = servo_count_fetch();
-  Serial.print("[info] start servo count iteration ");
-  Serial.println(servo_count);
+  read_mode();
 
-  Serial.print("[info] read mode from switch: ");
-  mode = digitalRead(PIN_SWITCH_MODE);
-  Serial.println(mode);
-
-  // enable LED 1 if first mode is select; same for LED 2 / second mode
+  // show state on the two state LEDs
   digitalWrite(PIN_LED_MODE_ONE, mode == 0);
   digitalWrite(PIN_LED_MODE_TWO, mode == 1);
 
   read_frequency();
-  display_status();
-  executeCycle();
 
-  // warn if servo_count is greater than MAX_SERVO_COUNT
-  if (servo_count >= MAX_SERVO_COUNT) {
-    Serial.println("[warn] reached servo count threshold");
-    digitalWrite(PIN_LED_WARN, HIGH);
+  display_status();
+
+  // execute next state iff the time threshold was exceeded
+  if (next_state_time <= millis()) {
+    Serial.println("[info] executing next state function");
+
+    next_state_fun();
+
+    // warn if the light barrier has not changed
+    const bool tmp_light_barrier = digitalRead(PIN_LIGHT);
+    if (tmp_light_barrier == next_state_light_barrier) {
+      Serial.println("[warn] light barrier has not changed");
+      digitalWrite(PIN_LED_WARN, HIGH);
+    }
+    next_state_light_barrier = tmp_light_barrier;
+
+    // warn if servo_count is greater than MAX_SERVO_COUNT
+    if (servo_count_read() >= MAX_SERVO_COUNT) {
+      Serial.println("[warn] reached servo count threshold");
+      digitalWrite(PIN_LED_WARN, HIGH);
+    }
   }
 
   // reset the device if the reset button is pressed
-  // TODO: check if it pressed longer, e.g., for two samples
   if (digitalRead(PIN_BUTTON_RESET)) {
     reset_cpap();
   }
