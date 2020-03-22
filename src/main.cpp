@@ -12,7 +12,6 @@ Servo servo;
  * Reset the device's state to a factory mode.
  *
  * This implies a reset of all LEDs and the servo counter in the EEPROM.
- *
  * This function should be called after the replacement of some hardware.
  */
 void reset_cpap() {
@@ -30,8 +29,6 @@ void reset_cpap() {
 
 /**
  * Open and close the tube with the mode's specific delays.
- *
- * @param amplitude to determine the time.
  */
 void executeCycle() {
   Serial.print("[info] execute mode (");
@@ -74,7 +71,9 @@ void executeCycle() {
   }
 }
 
-// define starting setup
+/**
+ * Setup the CPAP device. This function is run once while booting up.
+ */
 void setup() {
   Serial.begin(9600);
   Serial.println("[info] CPAP ventilator booting up...");
@@ -127,8 +126,9 @@ inline float read_frequency() {
   return breaths_per_minute;
 }
 
-//---------------------------------------------------------------------------------------------------------
-// main loop of the program
+/**
+ * Main loop, which is called endlessly during execution.
+ */
 void loop() {
   long unsigned int servo_count = servo_count_fetch();
   Serial.print("[info] start servo count iteration ");
