@@ -19,22 +19,9 @@ volatile int mode_sel = 0;
 
 Servo myservo;
 
-// to prevent debouncing define debounce time
-const long debouncing_time = 100000;
-volatile unsigned long last_micros = 0;
-
-// TODO what is this exactly for?
-int interruptCountOne = 0;
-int interruptCountTwo = 0;
-
 // Counter for the amount of processed loops. This is necessary to raise a
 // warning if some threshold is passed, configured as MAX_LOOP_COUNT.
 volatile long int loop_count = 0;
-
-// if this flag is set by interrupt-routine, LED will blink and signal reset of loopcount
-bool blinking_warning_loopcount = false;
-// define number of blinking for reset_warning
-const int ResetBlinkRepititions = 5;
 
 /**
  * Read PIN_SWITCH1 and sets mode_sel to its value.
@@ -46,89 +33,6 @@ int mode_sel_read_switch() {
   const bool switchVal = digitalRead(PIN_SWITCH1);
   mode_sel = (int) switchVal;
   return mode_sel;
-}
-
-void acoustic_warning_loopcount() {
-  for (int i = 0; i < ResetBlinkRepititions; i++) {
-    digitalWrite(PIN_SPEAKER, HIGH);
-    delay(300);
-    digitalWrite(PIN_SPEAKER, LOW);
-    delay(300);
-  }
-}
-
-void acoustic_warning_lightBarrier() {
-  digitalWrite(PIN_SPEAKER, HIGH);
-  digitalWrite(PIN_LEDWARN, HIGH);
-}
-
-void reset_lightbarrier_warning() {
-  digitalWrite(PIN_LEDWARN, LOW);
-  digitalWrite(PIN_SPEAKER, LOW);
-}
-
-void reset_loopcount_warning() {
-  digitalWrite(PIN_SPEAKER, LOW);
-  // reset global loopcount variable to 0
-  loop_count = 0;
-
-  // blink LED to signal resetting
-  blinking_warning_loopcount = true;
-}
-
-
-// actual interrupt-routine for second interrupt-button
-void InterruptTwo() {
-  long time_pressed = millis();
-
-  Serial.print("[warn] interrupt two has fired at ");
-  Serial.println(time_pressed);
-
-  // TODO `millis() - time_pressed` is _always_ near 0; the following cannot work
-  if ((long)(millis() - time_pressed) < 1000) {
-    // Serial.println("Reset Light Barrier");
-    reset_lightbarrier_warning();
-  }
-  // TODO `millis` has advanced, if the first if has been fulfilled; those are heavy side effects!
-  if ((long)(millis() - time_pressed) >= 5000) {  // Maybe find better times
-    // Serial.println("Reset LoopCounter");
-    reset_loopcount_warning();
-  }
-}
-
-void interrupt_commands() {
-  // TODO: unreachable code, interruptCount{One,Two} will never be changed
-  if (interruptCountOne == 1 && interruptCountTwo == 1) {
-    //digitalWrite(acousticPin, LOW);
-    digitalWrite(PIN_LEDWARN, LOW);
-  }
-}
-
-// interrupt-routine for second interrupt-button
-// has a debouncing routine and starts the actual interrupt function
-void debounceInterruptTwo() {
-  if ((long)(micros() - last_micros) >= debouncing_time*1) {
-    InterruptTwo();
-    last_micros = micros();
-  }
-}
-
-// routine to led LED blink
-void blinkLED_loopcount() {
-  for (int i = 0; i < ResetBlinkRepititions; i++) {
-    digitalWrite(PIN_LEDWARN, HIGH);
-    digitalWrite(PIN_SPEAKER, HIGH);
-    delay(300);
-
-    digitalWrite(PIN_LEDWARN, LOW);
-    digitalWrite(PIN_SPEAKER, LOW);
-    delay(300);
-  }
-
-  // reset blinking_warning flag to false
-  blinking_warning_loopcount = false;
-
-  // Serial.print("blinkLED finished");
 }
 
 /**
@@ -168,7 +72,6 @@ void executeMode(const int amplitude) {
   if (lightBefore == lightAfter) {
     // TODO: is it possible to reset warnings?
     Serial.println("[warn] light sensor value has NOT changed!");
-    acoustic_warning_lightBarrier();
   }
 }
 
@@ -192,10 +95,6 @@ void setup() {
 
   pinMode(PIN_LIGHT, INPUT_PULLUP);
 
-  // Lege die ISR 'blink' auf den Interruptpin mit Modus 'CHANGE':
-  // "Bei wechselnder Flanke auf dem Interruptpin" --> "Führe die ISR aus"
-  attachInterrupt(digitalPinToInterrupt(PIN_SWITCH2), debounceInterruptTwo, FALLING);
-
   myservo.write(0);
 
   Serial.begin(9600);
@@ -218,11 +117,6 @@ inline int readAmplitude() {
 //---------------------------------------------------------------------------------------------------------
 // main loop of the program
 void loop() {
-  // TODO: can this be removed?
-  // Reset Interrupt Counters
-  interruptCountOne = 0;
-  interruptCountTwo = 0;
-
   Serial.print("[info] read mode from switch: ");
   Serial.println(mode_sel_read_switch());
 
@@ -244,14 +138,6 @@ void loop() {
     Serial.println("[warn] reached loop count warning");
 
     digitalWrite(PIN_LEDWARN, HIGH);
-    acoustic_warning_loopcount();
   }
 
-  // let LED blink warning if reset was done
-  if (blinking_warning_loopcount) {
-    blinkLED_loopcount();
-    blinking_warning_loopcount = false;
-  }
-
-  interrupt_commands();
 }
