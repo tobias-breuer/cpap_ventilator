@@ -6,6 +6,12 @@ More information is available [on this page](https://www.uni-marburg.de/de/fb13/
 
 ## Hardware components
 
+### Arduino UNO Schematic Wiring 
+
+![Arduino UNO Wireing](img/cpap_ventilator_schema.png)
+
+### Arduino UNO Shield Design
+
 ![Arduino UNO Shield Unit](img/arduino_uno_shield.png)
 
 ## Deploying the Code
