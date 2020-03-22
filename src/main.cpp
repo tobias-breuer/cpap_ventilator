@@ -18,6 +18,8 @@ const mode_t modes[mode_sizeof] = {
 };
 volatile int mode = 0;
 
+float breaths_per_minute;
+
 Servo servo;
 
 /**
@@ -50,18 +52,21 @@ long unsigned int servo_count_fetch() {
  *
  * @param amplitude to determine the time.
  */
-void executeMode(const int amplitude) {
+void executeCycle() {
   Serial.print("[info] execute mode (");
   Serial.print(modes[mode].mult_inhale);
   Serial.print(", ");
   Serial.print(modes[mode].mult_exhale);
-  Serial.print(") with amplitude of ");
-  Serial.println(amplitude);
+  Serial.print(") with breathing frequency of ");
+  Serial.println(breaths_per_minute);
 
   // Open tube and wait. TODO: verify if this opens
-  Serial.println("[info] setting servo to 0");
+  float inhale_delay_ms = 60000 / breaths_per_minute * modes[mode].mult_inhale;
+  Serial.print("[info] setting servo to 0 for ");
+  Serial.print(inhale_delay_ms);
+  Serial.println("ms");
   servo.write(0);
-  delay(amplitude * modes[mode].mult_inhale);
+  delay(inhale_delay_ms);
 
   // Read light sensor's state.
   // TODO: which value is expected? check also if this matches
@@ -70,9 +75,12 @@ void executeMode(const int amplitude) {
   Serial.println(lightBefore);
 
   // Close tube and wait again.
-  Serial.println("[info] setting servo to 95");
+  float exhale_delay_ms = 60000 / breaths_per_minute * modes[mode].mult_exhale;
+  Serial.print("[info] setting servo to 95 for ");
+  Serial.print(exhale_delay_ms);
+  Serial.println("ms");
   servo.write(95);
-  delay(amplitude * modes[mode].mult_exhale);
+  delay(exhale_delay_ms);
 
   const bool lightAfter = digitalRead(PIN_LIGHT);
   Serial.print("[info] read light sensor: ");
@@ -120,9 +128,22 @@ void setup() {
  *
  * @return amplitude calculated from the potentiometer
  */
-inline int readAmplitude() {
-  int rawVal = analogRead(PIN_POTI);
-  return 60000/map(rawVal, 0, 1023, 8, 30);
+inline float read_frequency() {
+  Serial.print("[info] Reading potentiometer: ");
+
+  float poti = analogRead(PIN_POTI);
+  Serial.print(poti);
+  Serial.print("/");
+  Serial.print(POTI_MAX);
+
+  Serial.print(" resulting in ");
+  // map the values of the poti to the breaths per minute
+  // map() cannot be used, since it only works for int values 
+  breaths_per_minute = (poti - POTI_MIN) * (BPM_MAX - BPM_MIN) / (POTI_MAX - POTI_MIN) + BPM_MIN;
+  Serial.print(breaths_per_minute);
+  Serial.println(" breaths per minute.");
+  
+  return breaths_per_minute;
 }
 
 //---------------------------------------------------------------------------------------------------------
@@ -140,11 +161,8 @@ void loop() {
   digitalWrite(PIN_LED_MODE_ONE, mode == 0);
   digitalWrite(PIN_LED_MODE_TWO, mode == 1);
 
-  const int amplitude = readAmplitude();
-  Serial.print("[info] read amplitude: ");
-  Serial.println(amplitude);
-
-  executeMode(amplitude);
+  read_frequency();
+  executeCycle();
 
   // warn if servo_count is greater than MAX_SERVO_COUNT 
   if (servo_count >= MAX_SERVO_COUNT) {
