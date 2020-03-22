@@ -133,7 +133,9 @@ void state_open() {
 
   servo.write(SERVO_OPEN);
 
-  const float offset = 60000.0 / breaths_per_minute * modes[mode].mult_inhale;
+  // Calculate the next state execution time, for closing.
+  // Subtract the SERVO_CLOSE_LATENCY because of the delay while closing.
+  const float offset = 60000.0 / breaths_per_minute * modes[mode].mult_inhale - SERVO_CLOSE_LATENCY;
   next_state_time = millis() + (unsigned long) offset;
 
   next_state_fun = state_close;
@@ -154,6 +156,7 @@ void state_close() {
   Serial.print("[info] finished servo count iteration number ");
   Serial.println(servo_count_increment());
 
+  // Calculate the next state execution time, for opening.
   const float offset = 60000.0 / breaths_per_minute * modes[mode].mult_exhale;
   next_state_time = millis() + (unsigned long) offset;
 
