@@ -1,50 +1,12 @@
 #include <Arduino.h>
-#include <EEPROM.h>
 #include <Servo.h>
 
-/**
- * There are different modes to be operated. Each mode has a different
- * multiplier for the delay before and after operating the servo.
- */
-struct mode_t {
-  double mult_inhale;
-  double mult_exhale;
-};
-
-const int mode_sizeof = 2;
-const mode_t modes[mode_sizeof] = {
-  mode_t{0.5, 0.5},
-  mode_t{0.33, 0.66},
-};
-volatile int mode = 0;
+#include "./mode.h"
+#include "./servo_count.h"
 
 float breaths_per_minute;
 
 Servo servo;
-
-/**
- * Reset the internal servo counter in the EEPROM.
- */
-void servo_count_reset() {
-  long unsigned int servo_count = 0;
-  EEPROM.put(0, servo_count);
-}
-
-/**
- * Read the servo counter from the EEPROM and writes its increment back.
- *
- * This is a counter for the amount of processed servo interactions and
- * necessary to raise a warning if a threshold is passed, configured as
- * MAX_SERVO_COUNT.
- *
- * @return incremented servo counter
- */
-long unsigned int servo_count_fetch() {
-  long unsigned int servo_count = 0;
-  EEPROM.get(0, servo_count);
-  EEPROM.put(0, servo_count + 1);
-  return servo_count;
-}
 
 /**
  * Reset the device's state to a factory mode.
