@@ -8,11 +8,23 @@ More information is available [on this page](https://www.uni-marburg.de/de/fb13/
 
 ### Arduino UNO Schematic Wiring 
 
-![Arduino UNO Wireing](img/cpap_ventilator_schema.png)
+![Arduino UNO Wiring](img/cpap_ventilator_schema.png)
 
-### Arduino UNO Shield Design
+### Arduino UNO Pinout
 
-![Arduino UNO Shield Unit](img/arduino_uno_shield.png)
+```
+  -DPIN_SPEAKER=2
+  -DPIN_SWITCH_MODE=3
+  -DPIN_BUTTON_RESET=4
+  -DPIN_LED_MODE_ONE=5
+  -DPIN_LED_MODE_TWO=6
+  -DPIN_LED_WARN=7
+  -DPIN_SERVO=11
+  -DPIN_LIGHT=12
+  -DPIN_POTI=A0
+  -DPOTI_MIN=0
+  -DPOTI_MAX=1023
+```
 
 ## Deploying the Code
 
