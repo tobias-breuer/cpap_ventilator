@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <EEPROM.h>
 #include <Servo.h>
 
 /**
@@ -27,10 +28,6 @@ volatile unsigned long last_micros = 0;
 int interruptCountOne = 0;
 int interruptCountTwo = 0;
 
-// Counter for the amount of processed loops. This is necessary to raise a
-// warning if some threshold is passed, configured as MAX_LOOP_COUNT.
-volatile long int loop_count = 0;
-
 // if this flag is set by interrupt-routine, LED will blink and signal reset of loopcount
 bool blinking_warning_loopcount = false;
 // define number of blinking for reset_warning
@@ -46,6 +43,30 @@ int mode_sel_read_switch() {
   const bool switchVal = digitalRead(PIN_SWITCH1);
   mode_sel = (int) switchVal;
   return mode_sel;
+}
+
+/**
+ * Reset the internal servo counter in the EEPROM.
+ */
+void servo_count_reset() {
+  long unsigned int servo_count = 0;
+  EEPROM.put(0, servo_count);
+}
+
+/**
+ * Read the servo counter from the EEPROM and writes its increment back.
+ *
+ * This is a counter for the amount of processed servo interactions and
+ * necessary to raise a warning if a threshold is passed, configured as
+ * MAX_SERVO_COUNT.
+ *
+ * @return incremented servo counter
+ */
+long unsigned int servo_count_fetch() {
+  long unsigned int servo_count = 0;
+  EEPROM.get(0, servo_count);
+  EEPROM.put(0, servo_count + 1);
+  return servo_count;
 }
 
 void acoustic_warning_loopcount() {
@@ -70,7 +91,7 @@ void reset_lightbarrier_warning() {
 void reset_loopcount_warning() {
   digitalWrite(PIN_SPEAKER, LOW);
   // reset global loopcount variable to 0
-  loop_count = 0;
+  servo_count_reset();
 
   // blink LED to signal resetting
   blinking_warning_loopcount = true;
@@ -223,6 +244,10 @@ void loop() {
   interruptCountOne = 0;
   interruptCountTwo = 0;
 
+  long unsigned int servo_count = servo_count_fetch();
+  Serial.print("[info] start servo count iteration ");
+  Serial.println(servo_count);
+
   Serial.print("[info] read mode from switch: ");
   Serial.println(mode_sel_read_switch());
 
@@ -236,12 +261,9 @@ void loop() {
 
   executeMode(amplitude);
 
-  Serial.print("[info] finished loop iteration ");
-  Serial.println(++loop_count);
-
-  // warn if loopcount is greater than MAX_LOOP_COUNT
-  if (loop_count >= MAX_LOOP_COUNT) {
-    Serial.println("[warn] reached loop count warning");
+  // warn if servo_count is greater than MAX_SERVO_COUNT 
+  if (servo_count >= MAX_SERVO_COUNT) {
+    Serial.println("[warn] reached servo count threshold");
 
     digitalWrite(PIN_LEDWARN, HIGH);
     acoustic_warning_loopcount();
