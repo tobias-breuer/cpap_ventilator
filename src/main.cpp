@@ -6,8 +6,8 @@
  * multiplier for the delay before and after operating the servo.
  */
 struct mode_t {
-  double mult_before;
-  double mult_after;
+  double mult_inhale;
+  double mult_exhale;
 };
 
 const int mode_sizeof = 2;
@@ -15,25 +15,14 @@ const mode_t modes[mode_sizeof] = {
   mode_t{0.5, 0.5},
   mode_t{0.33, 0.66},
 };
-volatile int mode_sel = 0;
+volatile int mode = 0;
 
-Servo myservo;
+Servo servo;
 
 // Counter for the amount of processed loops. This is necessary to raise a
 // warning if some threshold is passed, configured as MAX_LOOP_COUNT.
 volatile long int loop_count = 0;
 
-/**
- * Read PIN_SWITCH1 and sets mode_sel to its value.
- * This requires that sizeof(modes) >= 2 or, even better, == 2.
- *
- * @return new value of mode_sel
- */
-int mode_sel_read_switch() {
-  const bool switchVal = digitalRead(PIN_SWITCH1);
-  mode_sel = (int) switchVal;
-  return mode_sel;
-}
 
 /**
  * Open and close the tube with the mode's specific delays.
@@ -42,16 +31,16 @@ int mode_sel_read_switch() {
  */
 void executeMode(const int amplitude) {
   Serial.print("[info] execute mode (");
-  Serial.print(modes[mode_sel].mult_before);
-  Serial.print(",");
-  Serial.print(modes[mode_sel].mult_after);
+  Serial.print(modes[mode].mult_inhale);
+  Serial.print(", ");
+  Serial.print(modes[mode].mult_exhale);
   Serial.print(") with amplitude of ");
   Serial.println(amplitude);
 
   // Open tube and wait. TODO: verify if this opens
   Serial.println("[info] setting servo to 0");
-  myservo.write(0);
-  delay(amplitude * modes[mode_sel].mult_before);
+  servo.write(0);
+  delay(amplitude * modes[mode].mult_inhale);
 
   // Read light sensor's state.
   // TODO: which value is expected? check also if this matches
@@ -61,8 +50,8 @@ void executeMode(const int amplitude) {
 
   // Close tube and wait again.
   Serial.println("[info] setting servo to 95");
-  myservo.write(95);
-  delay(amplitude * modes[mode_sel].mult_after);
+  servo.write(95);
+  delay(amplitude * modes[mode].mult_exhale);
 
   const bool lightAfter = digitalRead(PIN_LIGHT);
   Serial.print("[info] read light sensor: ");
@@ -77,28 +66,29 @@ void executeMode(const int amplitude) {
 
 // define starting setup
 void setup() {
-  myservo.attach(PIN_SERVO);
+  Serial.begin(9600);
+  Serial.println("[info] CPAP ventilator booting up...");
 
-  // define pins of LEDs as outputpins
-  pinMode(PIN_LEDONE, OUTPUT);
-  pinMode(PIN_LEDTWO, OUTPUT);
-  pinMode(PIN_LEDWARN, OUTPUT);
+  // init servo
+  servo.attach(PIN_SERVO);
+  servo.write(0);
+
+  // init pins of LEDs as outputs
+  pinMode(PIN_LED_MODE_ONE, OUTPUT);
+  pinMode(PIN_LED_MODE_TWO, OUTPUT);
+  pinMode(PIN_LED_WARN, OUTPUT);
   pinMode(PIN_SPEAKER, OUTPUT);
-  pinMode(PIN_LIGHT, INPUT);  // TODO: will be overwritten later
 
-  digitalWrite(PIN_LEDWARN, LOW);
+  // set output signals to low
+  digitalWrite(PIN_LED_MODE_ONE, LOW);
+  digitalWrite(PIN_LED_MODE_TWO, LOW);
+  digitalWrite(PIN_LED_WARN, LOW);
   digitalWrite(PIN_SPEAKER, LOW);
 
-  // Lege den Interruptpin als Inputpin mit Pullupwiderstand fest
-  pinMode(PIN_SWITCH1, INPUT_PULLUP);
-  pinMode(PIN_SWITCH2, INPUT_PULLUP);
-
+  // init input pins as input with internal pullups
+  pinMode(PIN_SWITCH_MODE, INPUT_PULLUP);
+  pinMode(PIN_BUTTON_RESET, INPUT_PULLUP);
   pinMode(PIN_LIGHT, INPUT_PULLUP);
-
-  myservo.write(0);
-
-  Serial.begin(9600);
-  Serial.println("[info] CPAP booting up...");
 }
 
 /**
@@ -118,11 +108,12 @@ inline int readAmplitude() {
 // main loop of the program
 void loop() {
   Serial.print("[info] read mode from switch: ");
-  Serial.println(mode_sel_read_switch());
+  mode = digitalRead(PIN_SWITCH_MODE);
+  Serial.println(mode);
 
   // enable LED 1 if first mode is select; same for LED 2 / second mode
-  digitalWrite(PIN_LEDONE, mode_sel == 0);
-  digitalWrite(PIN_LEDTWO, mode_sel == 1);
+  digitalWrite(PIN_LED_MODE_ONE, mode == 0);
+  digitalWrite(PIN_LED_MODE_TWO, mode == 1);
 
   const int amplitude = readAmplitude();
   Serial.print("[info] read amplitude: ");
@@ -137,7 +128,7 @@ void loop() {
   if (loop_count >= MAX_LOOP_COUNT) {
     Serial.println("[warn] reached loop count warning");
 
-    digitalWrite(PIN_LEDWARN, HIGH);
+    digitalWrite(PIN_LED_WARN, HIGH);
   }
 
 }
