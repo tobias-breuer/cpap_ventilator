@@ -15,15 +15,15 @@
 void servo_count_reset();
 
 /**
- * Read the servo counter from the EEPROM and writes its increment back.
- *
- * @return servo counter
- */
-long unsigned int servo_count_increment();
-
-/**
  * Read the servo counter from the EEPROM.
  *
  * @return servo counter
  */
 long unsigned int servo_count_read();
+
+/**
+ * Read the servo counter from the EEPROM and writes its increment back.
+ *
+ * @return servo counter
+ */
+long unsigned int servo_count_increment();

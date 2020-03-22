@@ -153,8 +153,9 @@ void state_close() {
 
   servo.write(SERVO_CLOSE);
 
+  const long unsigned int servo_count = servo_count_increment();
   Serial.print("[info] finished servo count iteration number ");
-  Serial.println(servo_count_increment());
+  Serial.println(servo_count);
 
   // Calculate the next state execution time, for opening.
   const float offset = 60000.0 / breaths_per_minute * modes[mode].mult_exhale;
