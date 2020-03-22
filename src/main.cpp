@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <EEPROM.h>
 #include <Servo.h>
 
 /**
@@ -19,9 +20,29 @@ volatile int mode = 0;
 
 Servo servo;
 
-// Counter for the amount of processed loops. This is necessary to raise a
-// warning if some threshold is passed, configured as MAX_LOOP_COUNT.
-volatile long int loop_count = 0;
+/**
+ * Reset the internal servo counter in the EEPROM.
+ */
+void servo_count_reset() {
+  long unsigned int servo_count = 0;
+  EEPROM.put(0, servo_count);
+}
+
+/**
+ * Read the servo counter from the EEPROM and writes its increment back.
+ *
+ * This is a counter for the amount of processed servo interactions and
+ * necessary to raise a warning if a threshold is passed, configured as
+ * MAX_SERVO_COUNT.
+ *
+ * @return incremented servo counter
+ */
+long unsigned int servo_count_fetch() {
+  long unsigned int servo_count = 0;
+  EEPROM.get(0, servo_count);
+  EEPROM.put(0, servo_count + 1);
+  return servo_count;
+}
 
 
 /**
@@ -107,6 +128,10 @@ inline int readAmplitude() {
 //---------------------------------------------------------------------------------------------------------
 // main loop of the program
 void loop() {
+  long unsigned int servo_count = servo_count_fetch();
+  Serial.print("[info] start servo count iteration ");
+  Serial.println(servo_count);
+
   Serial.print("[info] read mode from switch: ");
   mode = digitalRead(PIN_SWITCH_MODE);
   Serial.println(mode);
@@ -121,12 +146,9 @@ void loop() {
 
   executeMode(amplitude);
 
-  Serial.print("[info] finished loop iteration ");
-  Serial.println(++loop_count);
-
-  // warn if loopcount is greater than MAX_LOOP_COUNT
-  if (loop_count >= MAX_LOOP_COUNT) {
-    Serial.println("[warn] reached loop count warning");
+  // warn if servo_count is greater than MAX_SERVO_COUNT 
+  if (servo_count >= MAX_SERVO_COUNT) {
+    Serial.println("[warn] reached servo count threshold");
 
     digitalWrite(PIN_LED_WARN, HIGH);
   }
