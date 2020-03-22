@@ -1,5 +1,7 @@
 #include <Arduino.h>
 #include <EEPROM.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
 #include <Servo.h>
 
 /**
@@ -21,6 +23,8 @@ volatile int mode = 0;
 float breaths_per_minute;
 
 Servo servo;
+
+LiquidCrystal_I2C lcd(0x27);
 
 /**
  * Reset the internal servo counter in the EEPROM.
@@ -118,6 +122,10 @@ void setup() {
   pinMode(PIN_SWITCH_MODE, INPUT_PULLUP);
   pinMode(PIN_BUTTON_RESET, INPUT_PULLUP);
   pinMode(PIN_LIGHT, INPUT_PULLUP);
+
+  // init display
+  Wire.begin();
+  lcd.begin(16, 2);
 }
 
 /**
@@ -146,6 +154,19 @@ inline float read_frequency() {
   return breaths_per_minute;
 }
 
+inline void display_status() {
+  Serial.println("[info] updating display.");
+
+  lcd.home();
+  lcd.print("Breaths/Min: ");
+  lcd.print(breaths_per_minute);
+  lcd.setCursor(0, 1);
+  lcd.print("In-/Exhale: ");
+  lcd.print(modes[mode].mult_inhale);
+  lcd.print(" ");
+  lcd.print(modes[mode].mult_exhale);
+}
+
 //---------------------------------------------------------------------------------------------------------
 // main loop of the program
 void loop() {
@@ -162,6 +183,7 @@ void loop() {
   digitalWrite(PIN_LED_MODE_TWO, mode == 1);
 
   read_frequency();
+  display_status();
   executeCycle();
 
   // warn if servo_count is greater than MAX_SERVO_COUNT 
