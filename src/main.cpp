@@ -44,6 +44,25 @@ long unsigned int servo_count_fetch() {
   return servo_count;
 }
 
+/**
+ * Reset the device's state to a factory mode.
+ *
+ * This implies a reset of all LEDs and the servo counter in the EEPROM.
+ *
+ * This function should be called after the replacement of some hardware.
+ */
+void reset_cpap() {
+  Serial.println("[warn] entering reset_cpap function, cleaning all data...");
+
+  servo_count_reset();
+
+  digitalWrite(PIN_LED_MODE_ONE, 0);
+  digitalWrite(PIN_LED_MODE_TWO, 0);
+  digitalWrite(PIN_LED_WARN, 0);
+  digitalWrite(PIN_SPEAKER, 0);
+
+  Serial.println("[warn] finished reset_cpap function");
+}
 
 /**
  * Open and close the tube with the mode's specific delays.
@@ -77,11 +96,11 @@ void executeMode(const int amplitude) {
   const bool lightAfter = digitalRead(PIN_LIGHT);
   Serial.print("[info] read light sensor: ");
   Serial.println(lightAfter);
-  //
+
   // Alert iff light sensor has not changed afterwards.
   if (lightBefore == lightAfter) {
-    // TODO: is it possible to reset warnings?
     Serial.println("[warn] light sensor value has NOT changed!");
+    digitalWrite(PIN_LED_WARN, HIGH);
   }
 }
 
@@ -146,11 +165,15 @@ void loop() {
 
   executeMode(amplitude);
 
-  // warn if servo_count is greater than MAX_SERVO_COUNT 
+  // warn if servo_count is greater than MAX_SERVO_COUNT
   if (servo_count >= MAX_SERVO_COUNT) {
     Serial.println("[warn] reached servo count threshold");
-
     digitalWrite(PIN_LED_WARN, HIGH);
   }
 
+  // reset the device if the reset button is pressed
+  // TODO: check if it pressed longer, e.g., for two samples
+  if (digitalRead(PIN_BUTTON_RESET)) {
+    reset_cpap();
+  }
 }
