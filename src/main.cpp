@@ -156,8 +156,26 @@ inline void display_status() {
  * Display the error with different blinkings on the warning LED.
  */
 inline void display_error() {
-  // TODO: different blinking
-  digitalWrite(PIN_LED_WARN, error != err_none);
+  static volatile unsigned long next_blink_switch = 0;
+
+  switch (error) {
+    case err_light_barrier:
+      // A defect light barrier is critical and results in a permanent light
+      digitalWrite(PIN_LED_WARN, HIGH);
+      break;
+
+    case err_servo_count:
+      // Exceeding the threshold results in a flashing
+      if (next_blink_switch == 0 || (millis() >= next_blink_switch)) {
+        next_blink_switch = millis() + WARN_BLINK_MS;
+        digitalWrite(PIN_LED_WARN, !digitalRead(PIN_LED_WARN));
+      }
+      break;
+
+    case err_none:
+    default:
+      digitalWrite(PIN_LED_WARN, LOW);
+  }
 }
 
 /**
