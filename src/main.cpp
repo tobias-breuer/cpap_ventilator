@@ -11,6 +11,7 @@ inline void display_error();
 inline void display_status();
 inline void read_frequency();
 inline void read_mode();
+inline bool read_light_barrier();
 inline void reset_cpap();
 void loop();
 void setup();
@@ -119,6 +120,25 @@ inline void read_frequency() {
 }
 
 /**
+ * Read out the status of the light barrier 
+ * Differentiate between different types of light barriers 
+ */
+inline bool read_light_barrier(){
+  #if (LIGHT_BARRIER_MODEL == 1)
+  Serial.println(analogRead(PIN_LIGHT));
+  return (analogRead(PIN_LIGHT) > LIGHT_BARRIER_THRESHOLD);
+  #elif (LIGHT_BARRIER_MODEL == 2)
+  return digitalRead(PIN_LIGHT);
+  #elif (LIGHT_BARRIER_MODEL == 0)
+  volatile static bool last_state = false;
+  last_state = !last_state;
+  return last_state;
+  #else
+  #error LIGHT_BARRIER_MODEL has to be defined, if no light barrier is connected use 'NONE'
+  #endif
+}
+
+/**
  * Display the state on an external LCD display.
  */
 inline void display_status() {
@@ -211,7 +231,8 @@ void loop() {
 
     // warn if the light barrier has not changed
     // this warning is more urgent than the previous one and overwrites it
-    const bool tmp_light_barrier = digitalRead(PIN_LIGHT);
+    const bool tmp_light_barrier = read_light_barrier();
+
     if (tmp_light_barrier == next_state_light_barrier) {
       Serial.println("[warn] light barrier has not changed");
       error = err_light_barrier;
