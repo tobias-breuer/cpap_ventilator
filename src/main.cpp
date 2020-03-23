@@ -7,11 +7,12 @@
 #include "./servo_count.h"
 
 /* Signatures of all following functions */
+inline void display_error();
 inline void display_status();
 inline void read_frequency();
 inline void read_mode();
+inline void reset_cpap();
 void loop();
-void reset_cpap();
 void setup();
 void state_close();
 void state_open();
@@ -31,6 +32,10 @@ volatile float breaths_per_minute;
 volatile unsigned long next_state_time = 0;
 volatile bool next_state_light_barrier = false;
 void (*next_state_fun)() = state_open;
+
+/* Error types to distinguish between different errors */
+enum error_t { err_none, err_servo_count, err_light_barrier };
+volatile error_t error = err_none;
 
 /**
  * Setup the CPAP device. This function is run once while booting up.
@@ -71,15 +76,17 @@ void setup() {
  * This implies a reset of all LEDs and the servo counter in the EEPROM.
  * This function should be called after the replacement of some hardware.
  */
-void reset_cpap() {
+inline void reset_cpap() {
   Serial.println("[warn] entering reset_cpap function, cleaning all data...");
 
   servo_count_reset();
 
-  digitalWrite(PIN_LED_MODE_ONE, 0);
-  digitalWrite(PIN_LED_MODE_TWO, 0);
-  digitalWrite(PIN_LED_WARN, 0);
-  digitalWrite(PIN_SPEAKER, 0);
+  error = err_none;
+
+  digitalWrite(PIN_LED_MODE_ONE, LOW);
+  digitalWrite(PIN_LED_MODE_TWO, LOW);
+  digitalWrite(PIN_LED_WARN, LOW);
+  digitalWrite(PIN_SPEAKER, LOW);
 
   Serial.println("[warn] finished reset_cpap function");
 
@@ -123,6 +130,14 @@ inline void display_status() {
   lcd.print(modes[mode].mult_inhale);
   lcd.print(" ");
   lcd.print(modes[mode].mult_exhale);
+}
+
+/**
+ * Display the error with different blinkings on the warning LED.
+ */
+inline void display_error() {
+  // TODO: different blinking
+  digitalWrite(PIN_LED_WARN, error != err_none);
 }
 
 /**
@@ -188,20 +203,23 @@ void loop() {
 
     next_state_fun();
 
-    // warn if the light barrier has not changed
-    const bool tmp_light_barrier = digitalRead(PIN_LIGHT);
-    if (tmp_light_barrier == next_state_light_barrier) {
-      Serial.println("[warn] light barrier has not changed");
-      digitalWrite(PIN_LED_WARN, HIGH);
-    }
-    next_state_light_barrier = tmp_light_barrier;
-
     // warn if servo_count is greater than MAX_SERVO_COUNT
     if (servo_count_read() >= MAX_SERVO_COUNT) {
       Serial.println("[warn] reached servo count threshold");
-      digitalWrite(PIN_LED_WARN, HIGH);
+      error = err_servo_count;
     }
+
+    // warn if the light barrier has not changed
+    // this warning is more urgent than the previous one and overwrites it
+    const bool tmp_light_barrier = digitalRead(PIN_LIGHT);
+    if (tmp_light_barrier == next_state_light_barrier) {
+      Serial.println("[warn] light barrier has not changed");
+      error = err_light_barrier;
+    }
+    next_state_light_barrier = tmp_light_barrier;
   }
+
+  display_error();
 
   // reset the device if the reset button is pressed
   if (!digitalRead(PIN_BUTTON_RESET)) {
