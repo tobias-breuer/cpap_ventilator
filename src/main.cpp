@@ -4,7 +4,7 @@
 
 #include "./error.h"
 #include "./mode.h"
-#include "./servo_count.h"
+#include "./cycle_count.h"
 
 #ifdef MODE_AMBU
 #include "./ambu.h"
@@ -23,7 +23,7 @@ inline void reset();
 void loop();
 void setup();
 
-/* Reference to the LCD and servo */
+/* Reference to the LCD */
 LiquidCrystal_I2C lcd(0x27);
 
 /* Variable to measure the breaths per minute */
@@ -67,7 +67,7 @@ void setup() {
 /**
  * Reset the device's state to a factory mode.
  *
- * This implies a reset of all LEDs and the servo counter in the EEPROM.
+ * This implies a reset of all LEDs and the cycle counter in the EEPROM.
  * This function should be called after the replacement of some hardware.
  */
 inline void reset() {
@@ -140,7 +140,7 @@ inline void display_error() {
       digitalWrite(PIN_LED_WARN, HIGH);
       break;
 
-    case err_servo_count:
+    case err_cycle_count:
       // Exceeding the threshold results in a flashing
       if (next_blink_switch == 0 || (millis() >= next_blink_switch)) {
         next_blink_switch = millis() + WARN_BLINK_MS;

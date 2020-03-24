@@ -6,7 +6,7 @@
 #include "./cpap.h"
 #include "./error.h"
 #include "./mode.h"
-#include "./servo_count.h"
+#include "./cycle_count.h"
 
 inline bool cpap_read_light_barrier();
 void cpap_state_close();
@@ -34,10 +34,10 @@ void cpap_loop() {
     cpap_next_state_fun();
 
     // TODO: also implement for the AMBU_BAG
-    // warn if servo_count is greater than MAX_SERVO_COUNT
-    if (servo_count_read() >= MAX_SERVO_COUNT) {
-      Serial.println("[warn] reached servo count threshold");
-      error = err_servo_count;
+    // warn if cycle_count is greater than MAX_CYCLE_COUNT
+    if (cycle_count_read() >= MAX_CYCLE_COUNT) {
+      Serial.println("[warn] reached cycle count threshold");
+      error = err_cycle_count;
     }
 
     // warn if the light barrier has not changed
@@ -53,7 +53,7 @@ void cpap_loop() {
 }
 
 void cpap_reset() {
-  servo_count_reset();
+  cycle_count_reset();
 }
 
 void cpap_setup() {
@@ -111,9 +111,9 @@ void cpap_state_close() {
 
   servo.write(SERVO_CLOSE);
 
-  const long unsigned int servo_count = servo_count_increment();
-  Serial.print("[info] finished servo count iteration number ");
-  Serial.println(servo_count);
+  const long unsigned int cycle_count = cycle_count_increment();
+  Serial.print("[info] finished cycle count iteration number ");
+  Serial.println(cycle_count);
 
   // Calculate the next state execution time, for opening.
   const float offset = 60000.0 / breaths_per_minute * modes[mode].mult_exhale;
