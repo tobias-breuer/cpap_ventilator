@@ -22,4 +22,4 @@ const mode_t modes[mode_sizeof] = {
 };
 
 /* Selection of the current mode from the modes above. */
-volatile int mode = 0;
+extern volatile int mode;

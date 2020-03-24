@@ -6,7 +6,7 @@ More information is available [on this page](https://www.uni-marburg.de/de/fb13/
 
 ## Hardware components
 
-### Arduino UNO Schematic Wiring 
+### Arduino UNO Schematic Wiring
 
 ![Arduino UNO Wiring](img/cpap_ventilator_schema.png)
 
@@ -30,7 +30,12 @@ More information is available [on this page](https://www.uni-marburg.de/de/fb13/
 
 The project is now maintained as as a [platformio project](https://platformio.org), in order to manage dependencies and compatibility with other platforms.
 
-The project can be build and flashed using `pio run -t upload`.
+The project can be build and flashed using:
+
+```
+pio run -t upload -e uno_cpap  # for the CPAP board
+pio run -t upload -e uno_ambu  # for the Ambu Bag board
+```
 
 ## Discussion
 
