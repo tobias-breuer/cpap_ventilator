@@ -13,6 +13,8 @@ inline void read_frequency();
 inline void read_mode();
 inline bool read_light_barrier();
 inline void reset_cpap();
+inline void motor_write_direction();
+inline void motor_measure_cycle();
 void loop();
 void setup();
 void state_close();
@@ -24,6 +26,14 @@ Servo servo;
 
 /* Variable to measure the breaths per minute */
 volatile float breaths_per_minute;
+
+enum direction_t {
+  backward = -1,
+  stop = 0,
+  forward = 1,
+};
+
+direction_t direction = forward;
 
 /* Variables for the next state:
  * - timestamp (ms) of next execution
@@ -66,9 +76,15 @@ void setup() {
   pinMode(PIN_BUTTON_RESET, INPUT_PULLUP);
   pinMode(PIN_LIGHT, INPUT_PULLUP);
 
+  pinMode(PIN_MOTOR_IN3, OUTPUT);
+  pinMode(PIN_MOTOR_IN4, OUTPUT);
+  pinMode(PIN_MOTOR_STOP, INPUT_PULLUP);
+
   // init display
   Wire.begin();
   lcd.begin(16, 2);
+
+  motor_measure_cycle();
 }
 
 /**
@@ -120,8 +136,8 @@ inline void read_frequency() {
 }
 
 /**
- * Read out the status of the light barrier 
- * Differentiate between different types of light barriers 
+ * Read out the status of the light barrier
+ * Differentiate between different types of light barriers
  */
 inline bool read_light_barrier(){
   #if (LIGHT_BARRIER_MODEL == 1)
@@ -136,6 +152,68 @@ inline bool read_light_barrier(){
   #else
   #error LIGHT_BARRIER_MODEL has to be defined, if no light barrier is connected use 'NONE'
   #endif
+}
+
+inline long motor_read_stop() {
+  static long last_stop = millis();
+
+  if (!digitalRead(PIN_MOTOR_STOP)) {
+    const long now = millis();
+    if (now - last_stop > MOTOR_STOP_DEBOUNCE_MS){
+      long breathing_cycle_ms = now - last_stop;
+
+      last_stop = now;
+      direction = (direction_t) -direction;
+
+      Serial.print("[info] reached stop pin after ");
+      Serial.print(breathing_cycle_ms);
+      Serial.print(" ms, setting direction ");
+      Serial.println(direction);
+
+      return breathing_cycle_ms;
+    }
+  }
+
+  return 0;
+}
+
+long breathing_cycle_ms = 0;
+
+inline void motor_measure_cycle() {
+  Serial.println("[info] measuring motor cycle duration");
+  motor_write_direction();
+
+  while (breathing_cycle_ms == 0) {
+    breathing_cycle_ms = motor_read_stop();
+  }
+  Serial.print("[info] first cycle took ");
+  Serial.print(breathing_cycle_ms);
+  Serial.println("ms");
+  breathing_cycle_ms = 0;
+
+  while (breathing_cycle_ms == 0) {
+    breathing_cycle_ms = motor_read_stop();
+  }
+  Serial.print("[info] a breathing cycle takes ");
+  Serial.print(breathing_cycle_ms);
+  Serial.println("ms");
+}
+
+inline void motor_write_direction() {
+  switch(direction) {
+    case forward:
+      analogWrite(PIN_MOTOR_IN3, 0);
+      analogWrite(PIN_MOTOR_IN4, 255);
+      break;
+    case backward:
+      analogWrite(PIN_MOTOR_IN3, 255);
+      analogWrite(PIN_MOTOR_IN4, 0);
+      break;
+    default:
+      analogWrite(PIN_MOTOR_IN3, 0);
+      analogWrite(PIN_MOTOR_IN4, 0);
+      break;
+  }
 }
 
 /**
@@ -235,12 +313,17 @@ void loop() {
 
   display_status();
 
+#if AMBU_BAG
+  motor_read_stop();
+  motor_write_direction();
+#elif CPAP
   // execute next state iff the time threshold was exceeded
   if (next_state_time <= millis()) {
     Serial.println("[info] executing next state function");
 
     next_state_fun();
 
+    // TODO: also implement for the AMBU_BAG
     // warn if servo_count is greater than MAX_SERVO_COUNT
     if (servo_count_read() >= MAX_SERVO_COUNT) {
       Serial.println("[warn] reached servo count threshold");
@@ -257,6 +340,7 @@ void loop() {
     }
     next_state_light_barrier = tmp_light_barrier;
   }
+#endif
 
   display_error();
 
