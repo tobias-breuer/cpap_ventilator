@@ -27,3 +27,8 @@ long unsigned int cycle_count_read();
  * @return cycle counter
  */
 long unsigned int cycle_count_increment();
+
+/**
+ * Check the cycle counter and optionally update the error.
+ */
+void cycle_warn_display();

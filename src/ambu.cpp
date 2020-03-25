@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 #include "./ambu.h"
+#include "./cycle_count.h"
 
 inline void ambu_motor_measure_cycle();
 long ambu_motor_read_stop();
@@ -25,7 +26,7 @@ void ambu_loop() {
 }
 
 void ambu_reset() {
-  /* nop */
+  ambu_setup();
 }
 
 void ambu_setup() {
@@ -51,6 +52,12 @@ long ambu_motor_read_stop() {
       Serial.print(breathing_cycle_ms);
       Serial.print(" ms, setting direction ");
       Serial.println(direction);
+
+      // increment cycle counter if we switched back to forward mode
+      if (direction == forward) {
+        Serial.print("[info] finished cycle count iteration number ");
+        Serial.println(cycle_count_increment());
+      }
 
       return breathing_cycle_ms;
     }
@@ -85,14 +92,16 @@ void ambu_motor_write_direction() {
       analogWrite(PIN_MOTOR_IN3, 0);
       analogWrite(PIN_MOTOR_IN4, 255);
       break;
+
     case backward:
       analogWrite(PIN_MOTOR_IN3, 255);
       analogWrite(PIN_MOTOR_IN4, 0);
       break;
+
+    case stop:
     default:
       analogWrite(PIN_MOTOR_IN3, 0);
       analogWrite(PIN_MOTOR_IN4, 0);
-      break;
   }
 }
 

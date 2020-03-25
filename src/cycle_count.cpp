@@ -2,6 +2,7 @@
 #include <EEPROM.h>
 
 #include "./cycle_count.h"
+#include "./error.h"
 
 /**
  * Variable used for local caching to not query the EEPROM too much.
@@ -36,4 +37,19 @@ long unsigned int cycle_count_increment() {
   }
 
   return cycle_cache - 1;
+}
+
+void cycle_warn_display() {
+  static bool cycle_warn_raised = false;
+
+  if (cycle_warn_raised) {
+    return;
+  }
+
+  if (cycle_count_read() >= MAX_CYCLE_COUNT) {
+    Serial.println("[warn] reached cycle count threshold");
+    error = err_cycle_count;
+
+    cycle_warn_raised = true;
+  }
 }

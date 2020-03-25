@@ -79,6 +79,8 @@ inline void reset() {
   cpap_reset();
 #endif
 
+  cycle_count_reset();
+
   error = err_none;
 
   digitalWrite(PIN_LED_MODE_ONE, LOW);
@@ -168,6 +170,10 @@ void loop() {
 
   display_status();
 
+  // warn if cycle_count is greater than MAX_CYCLE_COUNT
+  cycle_warn_display();
+
+  // A more urgent specific error might overwrite the previous cycle warning.
 #ifdef MODE_AMBU
   ambu_loop();
 #elif MODE_CPAP
