@@ -3,8 +3,7 @@
 #include <LiquidCrystal_I2C.h>
 
 #include "./error.h"
-#include "./mode.h"
-#include "./cycle_count.h"
+#include "./state.h"
 
 #ifdef MODE_AMBU
 #include "./ambu.h"
@@ -97,11 +96,8 @@ inline void reset() {
  */
 inline void read_mode() {
   const int tmp_mode = digitalRead(PIN_SWITCH_MODE);
-  if (tmp_mode != mode) {
-    mode = tmp_mode;
-
-    Serial.print("[info] update mode to ");
-    Serial.println(mode);
+  if (tmp_mode != mode_read()) {
+    mode_write(tmp_mode);
   }
 }
 
@@ -125,9 +121,9 @@ inline void display_status() {
   lcd.print(breaths_per_minute);
   lcd.setCursor(0, 1);
   lcd.print("In-/Exhale: ");
-  lcd.print(modes[mode].mult_inhale);
+  lcd.print(mode_get().mult_inhale);
   lcd.print(" ");
-  lcd.print(modes[mode].mult_exhale);
+  lcd.print(mode_get().mult_exhale);
 }
 
 /**
@@ -163,8 +159,8 @@ void loop() {
   read_mode();
 
   // show state on the two state LEDs
-  digitalWrite(PIN_LED_MODE_ONE, mode == 0);
-  digitalWrite(PIN_LED_MODE_TWO, mode == 1);
+  digitalWrite(PIN_LED_MODE_ONE, mode_read() == 0);
+  digitalWrite(PIN_LED_MODE_TWO, mode_read() == 1);
 
   read_frequency();
 

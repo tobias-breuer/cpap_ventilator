@@ -4,9 +4,8 @@
 #include <Servo.h>
 
 #include "./cpap.h"
-#include "./cycle_count.h"
 #include "./error.h"
-#include "./mode.h"
+#include "./state.h"
 
 inline bool cpap_read_light_barrier();
 void cpap_state_close();
@@ -53,7 +52,7 @@ void cpap_setup() {
   pinMode(PIN_LIGHT, INPUT_PULLUP);
 
   // init servo
-  servo.attach(PIN_SERVO);
+  servo.attach(PIN_SERVO, 800, 2100);
   servo.write(0);
 }
 
@@ -86,7 +85,7 @@ void cpap_state_open() {
 
   // Calculate the next state execution time, for closing.
   // Subtract the SERVO_CLOSE_LATENCY because of the delay while closing.
-  const float offset = 60000.0 / breaths_per_minute * modes[mode].mult_inhale - SERVO_CLOSE_LATENCY;
+  const float offset = 60000.0 / breaths_per_minute * mode_get().mult_inhale - SERVO_CLOSE_LATENCY;
   cpap_next_state_time = millis() + (unsigned long) offset;
 
   cpap_next_state_fun = cpap_state_close;
@@ -108,7 +107,7 @@ void cpap_state_close() {
   Serial.println(cycle_count_increment());
 
   // Calculate the next state execution time, for opening.
-  const float offset = 60000.0 / breaths_per_minute * modes[mode].mult_exhale;
+  const float offset = 60000.0 / breaths_per_minute * mode_get().mult_exhale;
   cpap_next_state_time = millis() + (unsigned long) offset;
 
   cpap_next_state_fun = cpap_state_open;

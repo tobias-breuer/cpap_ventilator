@@ -3,7 +3,7 @@
 #include <Arduino.h>
 
 #include "./ambu.h"
-#include "./cycle_count.h"
+#include "./state.h"
 
 inline void ambu_motor_measure_cycle();
 long ambu_motor_read_stop();
