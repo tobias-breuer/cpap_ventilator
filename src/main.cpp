@@ -48,8 +48,9 @@ void setup() {
   digitalWrite(PIN_SPEAKER, LOW);
 
   // init input pins as input with internal pullups
-  pinMode(PIN_SWITCH_MODE, INPUT_PULLUP);
-  pinMode(PIN_BUTTON_RESET, INPUT_PULLUP);
+  pinMode(PIN_SWITCH_MODE_A, INPUT_PULLUP);
+  pinMode(PIN_SWITCH_MODE_B, INPUT_PULLUP);
+  pinMode(PIN_SWITCH_RESET, INPUT_PULLUP);
 
   // init display
   Wire.begin();
@@ -95,7 +96,28 @@ inline void reset() {
  * Read the mode from the slide switch and notify potential updates.
  */
 inline void read_mode() {
-  const int tmp_mode = digitalRead(PIN_SWITCH_MODE);
+  int tmp_mode = mode_read();
+
+  static volatile long switch_mode_a_down = millis();
+  if (!digitalRead(PIN_SWITCH_MODE_A)) {
+    if (millis() - switch_mode_a_down > 500) {
+      switch_mode_a_down = millis();
+      tmp_mode = 0;
+    }
+  } else {
+    switch_mode_a_down = millis();
+  }
+
+  static volatile long switch_mode_b_down = millis();
+  if (!digitalRead(PIN_SWITCH_MODE_B)) {
+    if (millis() - switch_mode_b_down > 500) {
+      switch_mode_b_down = millis();
+      tmp_mode = 1;
+    }
+  } else {
+    switch_mode_b_down = millis();
+  }
+
   if (tmp_mode != mode_read()) {
     mode_write(tmp_mode);
   }
@@ -179,7 +201,7 @@ void loop() {
   display_error();
 
   // reset the device if the reset button is pressed
-  if (!digitalRead(PIN_BUTTON_RESET)) {
+  if (!digitalRead(PIN_SWITCH_RESET)) {
     reset();
   }
 }
