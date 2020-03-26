@@ -2,6 +2,7 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 
+#include "./button.h"
 #include "./error.h"
 #include "./state.h"
 
@@ -87,9 +88,6 @@ inline void reset() {
   digitalWrite(PIN_LED_MODE_TWO, LOW);
   digitalWrite(PIN_LED_WARN, LOW);
   digitalWrite(PIN_SPEAKER, LOW);
-
-  // "debounce" button
-  delay(1000);
 }
 
 /**
@@ -98,25 +96,8 @@ inline void reset() {
 inline void read_mode() {
   int tmp_mode = mode_read();
 
-  static volatile long switch_mode_a_down = millis();
-  if (!digitalRead(PIN_SWITCH_MODE_A)) {
-    if (millis() - switch_mode_a_down > 500) {
-      switch_mode_a_down = millis();
-      tmp_mode = 0;
-    }
-  } else {
-    switch_mode_a_down = millis();
-  }
-
-  static volatile long switch_mode_b_down = millis();
-  if (!digitalRead(PIN_SWITCH_MODE_B)) {
-    if (millis() - switch_mode_b_down > 500) {
-      switch_mode_b_down = millis();
-      tmp_mode = 1;
-    }
-  } else {
-    switch_mode_b_down = millis();
-  }
+  debounce_btn(PIN_SWITCH_MODE_A, 500) { tmp_mode = 0; }
+  debounce_btn(PIN_SWITCH_MODE_B, 500) { tmp_mode = 1; }
 
   if (tmp_mode != mode_read()) {
     mode_write(tmp_mode);
@@ -201,7 +182,7 @@ void loop() {
   display_error();
 
   // reset the device if the reset button is pressed
-  if (!digitalRead(PIN_SWITCH_RESET)) {
+  debounce_btn(PIN_SWITCH_RESET, 1000) {
     reset();
   }
 }
