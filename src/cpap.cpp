@@ -52,7 +52,7 @@ void cpap_setup() {
   pinMode(PIN_LIGHT, INPUT_PULLUP);
 
   // init servo
-  servo.attach(PIN_SERVO, 800, 2100);
+  servo.attach(PIN_SERVO, 800, 2250);
   servo.write(0);
 }
 
