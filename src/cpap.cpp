@@ -107,7 +107,7 @@ void cpap_state_close() {
   Serial.println(cycle_count_increment());
 
   // Calculate the next state execution time, for opening.
-  const float offset = 60000.0 / breaths_per_minute * mode_get().mult_exhale;
+  const float offset = 60000.0 / breaths_per_minute * mode_get().mult_exhale + SERVO_CLOSE_LATENCY;
   cpap_next_state_time = millis() + (unsigned long) offset;
 
   cpap_next_state_fun = cpap_state_open;

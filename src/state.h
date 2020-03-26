@@ -47,8 +47,8 @@ struct mode_t {
 /* The _two_ preconfigured ventilation profiles: 1:1 and 1:2 */
 const int mode_sizeof = 2;
 const mode_t modes[mode_sizeof] = {
+  mode_t{0.33, 0.67},
   mode_t{0.5, 0.5},
-  mode_t{0.33, 0.66},
 };
 
 /**
