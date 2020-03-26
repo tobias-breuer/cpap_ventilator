@@ -47,3 +47,12 @@ running time from the time interval until the next closing.
 
 We have measured for 1:1 and 1:2 resulting in an offset of round about 0.18
 seconds off. This _magic_ value is removed as `SERVO_CLOSE_LATENCY`.
+
+
+### EEPROM state
+
+Some state variables, e.g., the cycle counter or the last mode, are stored in
+the Arduino's EEPROM. Thus these values can be stored reboot-safe.
+
+However, at the initial boot those values might be not nulled. So the controller
+should be reset via the reset button at the first start.

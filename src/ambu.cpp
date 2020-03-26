@@ -11,6 +11,7 @@ inline double ambu_state_fun(double);
 
 extern volatile float breaths_per_minute;
 
+// Motor's direction as a type and a state variable.
 enum direction_t {
   backward = -1,
   stop = 0,
@@ -18,12 +19,15 @@ enum direction_t {
 };
 direction_t direction = forward;
 
+// Variable to determine the time (s) for each breath cycle.
 double breath_time_s = 0;
 
 void ambu_loop() {
+  // Restrict the bpm value to the ambu bag limits.
   breaths_per_minute = min(max(breaths_per_minute, AMBU_MIN_CYCLE), AMBU_MAX_CYCLE);
   breath_time_s = 60.0 / (breaths_per_minute);
 
+  // Read the current state and adjust the motor speed.
   const double breathing_cycle_s = (double) ambu_motor_state_read() / 1000.0;
   const double speed = ambu_state_fun(breathing_cycle_s);
 
@@ -40,6 +44,15 @@ void ambu_setup() {
   pinMode(PIN_MOTOR_STOP, INPUT_PULLUP);
 }
 
+/**
+ * Reads the current motor state and determines the time (ms) of the current
+ * state. This value is within [0, max_time_for_bpm_mode].
+ *
+ * Furthermore, this funciton checks if the motor stop button was pressed or a
+ * timeout was reached to change the motor's direction.
+ *
+ * @return time in the current cycle in ms
+ */
 inline long ambu_motor_state_read() {
   static long last_stop = millis();
 
@@ -78,6 +91,12 @@ inline long ambu_motor_state_read() {
   return breathing_cycle_ms;
 }
 
+/**
+ * Set the motor's speed as calculated by ambu_state_fun. The direction is
+ * determined by the global direction variable.
+ *
+ * @param speed motor speed
+ */
 void ambu_motor_write_direction(double speed) {
   switch (direction) {
     case forward:
@@ -97,6 +116,23 @@ void ambu_motor_write_direction(double speed) {
   }
 }
 
+/**
+ * Calculate the current motor speed based on the bpm, maximum/minium bpm and
+ * the current time position.
+ *
+ * This function calculates two points in a 2D area between time (x) and motor
+ * speed (y). The first point is fixed at x=0 and its y value is determined by
+ * the factor of the maximum speed to the current one. The other point is fixed
+ * at y=255 and its x value is based on the product of the factor of the minimum
+ * time - maximum bpm.
+ *
+ * A gradient between those two points effects the acceleration and
+ * decceleration of the motor. For the fastest bpm value, there is only full
+ * speed. However, the slowest bpm value results in longer edges.
+ *
+ * @param pos_s current time position in seconds; [0, max_time_for_bpm_mode]
+ * @return speed as an value of (0, 255]
+ */
 inline double ambu_state_fun(double pos_s) {
   const double factor = breath_time_s / AMBU_MIN_BREATH_S;
 
