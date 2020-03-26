@@ -25,7 +25,7 @@ void ambu_loop() {
   breath_time_s = 60.0 / (breaths_per_minute);
 
   const double breathing_cycle_s = (double) ambu_motor_state_read() / 1000.0;
-  const double speed = ambu_state_fun(breathing_cycle_s);  // TODO: read correct mode
+  const double speed = ambu_state_fun(breathing_cycle_s);
 
   ambu_motor_write_direction(speed);
 }
@@ -46,9 +46,11 @@ inline long ambu_motor_state_read() {
   const long now = millis();
   const long breathing_cycle_ms = now - last_stop;
 
+  const double mode_mult = (direction == backward) ? mode_get().mult_exhale : mode_get().mult_inhale;
+
   const bool is_motor_stop = !digitalRead(PIN_MOTOR_STOP);
   const bool is_motor_debounced = breathing_cycle_ms > MOTOR_STOP_DEBOUNCE_MS;
-  const bool is_timeout = breathing_cycle_ms >= (breath_time_s * 1000);
+  const bool is_timeout = breathing_cycle_ms >= (breath_time_s * 1000 * mode_mult);
 
   // update last_stop iff button is pressed and debounced or timeout is reached
   if ((is_motor_stop && is_motor_debounced) || is_timeout) {
@@ -62,8 +64,10 @@ inline long ambu_motor_state_read() {
 
     // increment cycle counter if we switched back to forward mode
     if (direction == forward) {
+      const long unsigned int cycle_count = cycle_count_increment();
+
       Serial.print("[info] finished cycle count iteration number ");
-      Serial.println(cycle_count_increment());
+      Serial.println(cycle_count);
     }
 
     // after switching the mode, last_stop was updated and recalculating the
@@ -94,18 +98,17 @@ void ambu_motor_write_direction(double speed) {
 }
 
 inline double ambu_state_fun(double pos_s) {
-  // TODO mode_multi
-
   const double factor = breath_time_s / AMBU_MIN_BREATH_S;
 
-  const int pt_min_y = 255 - (int) (255.0 / factor);
-  const int pt_max_x = AMBU_MIN_BREATH_S * factor;
+  const double mode_mult = (direction == backward) ? mode_get().mult_exhale : mode_get().mult_inhale;
+  const int pt_min_y = (int) (255.0 / factor);
+  const int pt_max_x = AMBU_MIN_BREATH_S * factor * mode_mult;
 
   const double gradient = (255.0 - pt_min_y) / (pt_max_x);
 
-  const double x_s = (direction == backward) ? pt_max_x - pos_s : pos_s;
+  const double t_s = (direction == backward) ? pt_max_x - pos_s : pos_s;
 
-  return gradient * x_s + pt_min_y;
+  return gradient * t_s + pt_min_y;
 }
 
 #endif  // MODE_AMBU
