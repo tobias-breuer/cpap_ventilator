@@ -68,8 +68,9 @@ void setup() {
 /**
  * Reset the device's state to a factory mode.
  *
- * This implies a reset of all LEDs and the cycle counter in the EEPROM.
- * This function should be called after the replacement of some hardware.
+ * This implies a reset of all LEDs and the states stored in the EEPROM.
+ * This function should be called after assembly and after the replacement of
+ * some hardware.
  */
 inline void reset() {
   Serial.println("[warn] entering reset function, cleaning all data...");
@@ -81,6 +82,7 @@ inline void reset() {
 #endif
 
   cycle_count_reset();
+  mode_reset();
 
   error = err_none;
 
